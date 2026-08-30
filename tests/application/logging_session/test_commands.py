@@ -67,17 +67,35 @@ def _submit_request(**overrides: object) -> SubmitQsoRequest:
 def test_start_new_session_seeds_defaults_and_saves() -> None:
     repository = FakeRepository()
     result = StartNewSessionCommand(repository).execute(
-        qso_date=date(2026, 8, 30), time_on=time(9, 0)
+        qso_date=date(2026, 8, 30), time_on=time(9, 0), park_reference="K-1234", freq="14.062"
     )
     assert result.entry_defaults.operator == "SM6Y"
     assert result.qsos == ()
     assert repository.session is not None
 
 
+def test_start_new_session_seeds_my_sig_info_from_park_reference() -> None:
+    repository = FakeRepository()
+    result = StartNewSessionCommand(repository).execute(
+        qso_date=date(2026, 8, 30), time_on=time(9, 0), park_reference="K-1234", freq="14.062"
+    )
+    assert result.entry_defaults.my_sig_info == "K-1234"
+
+
+def test_start_new_session_seeds_freq_from_given_frequency() -> None:
+    repository = FakeRepository()
+    result = StartNewSessionCommand(repository).execute(
+        qso_date=date(2026, 8, 30), time_on=time(9, 0), park_reference="K-1234", freq="14.062"
+    )
+    assert result.entry_defaults.freq == "14.062"
+
+
 def test_start_new_session_archives_existing_unfinished_session() -> None:
     existing = LoggingSession.start(StationDefaults(), QsoTimestamp(date(2026, 8, 29), time(9, 0)))
     repository = FakeRepository(existing)
-    StartNewSessionCommand(repository).execute(qso_date=date(2026, 8, 30), time_on=time(9, 0))
+    StartNewSessionCommand(repository).execute(
+        qso_date=date(2026, 8, 30), time_on=time(9, 0), park_reference="K-1234", freq="14.062"
+    )
     assert repository.archived == [existing]
 
 

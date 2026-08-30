@@ -6,6 +6,7 @@ from radio_pota_logging.domain.logging_session.exceptions import (
     FrequencyOutOfBandError,
 )
 from radio_pota_logging.domain.logging_session.value_objects import (
+    MODE_OPTIONS,
     Band,
     EntryDefaults,
     Frequency,
@@ -15,17 +16,17 @@ from radio_pota_logging.domain.logging_session.value_objects import (
 )
 
 
-def _qso(call: str) -> Qso:
+def _qso(call: str = "W1AW", my_sig_info: str = "K-1234", operator: str = "SM6Y") -> Qso:
     return Qso(
         call=call,
         timestamp=QsoTimestamp(date(2026, 8, 30), time(9, 0)),
         mode="CW",
         my_sig="POTA",
-        my_sig_info="K-1234",
+        my_sig_info=my_sig_info,
         rst_sent="599",
         rst_rcvd="599",
         freq=Frequency.parse("14.062"),
-        operator="SM6Y",
+        operator=operator,
         my_rig="Elecraft KX2",
         tx_pwr="5",
     )
@@ -97,7 +98,35 @@ def test_entry_defaults_seed_leaves_my_sig_info_and_freq_empty() -> None:
     assert defaults.rst_rcvd == "599"
     assert defaults.my_rig == "Elecraft KX2"
     assert defaults.tx_pwr == "5"
+
+
+def test_entry_defaults_seed_uses_given_my_sig_info() -> None:
+    now = QsoTimestamp(date(2026, 8, 30), time(9, 0))
+    defaults = EntryDefaults.seed(StationDefaults(), now, my_sig_info="K-1234")
+    assert defaults.my_sig_info == "K-1234"
     assert defaults.timestamp == now
+
+
+def test_entry_defaults_seed_normalizes_my_sig_info_to_uppercase() -> None:
+    now = QsoTimestamp(date(2026, 8, 30), time(9, 0))
+    defaults = EntryDefaults.seed(StationDefaults(), now, my_sig_info="k-1234")
+    assert defaults.my_sig_info == "K-1234"
+
+
+def test_entry_defaults_seed_uses_given_freq() -> None:
+    now = QsoTimestamp(date(2026, 8, 30), time(9, 0))
+    defaults = EntryDefaults.seed(StationDefaults(), now, freq="14.062")
+    assert defaults.freq == "14.062"
+
+
+def test_entry_defaults_seed_normalizes_operator_to_uppercase() -> None:
+    now = QsoTimestamp(date(2026, 8, 30), time(9, 0))
+    defaults = EntryDefaults.seed(StationDefaults(operator="sm6y"), now)
+    assert defaults.operator == "SM6Y"
+
+
+def test_mode_options_is_cw_and_ssb() -> None:
+    assert MODE_OPTIONS == ("CW", "SSB")
 
 
 @pytest.mark.parametrize(
@@ -110,4 +139,28 @@ def test_entry_defaults_seed_leaves_my_sig_info_and_freq_empty() -> None:
     ],
 )
 def test_qso_call_is_normalized_to_uppercase(call_text: str, expected: str) -> None:
-    assert _qso(call_text).call == expected
+    assert _qso(call=call_text).call == expected
+
+
+@pytest.mark.parametrize(
+    ("my_sig_info_text", "expected"),
+    [
+        ("k-1234", "K-1234"),
+        ("K-1234", "K-1234"),
+        ("k-1234ab", "K-1234AB"),
+    ],
+)
+def test_qso_my_sig_info_is_normalized_to_uppercase(my_sig_info_text: str, expected: str) -> None:
+    assert _qso(my_sig_info=my_sig_info_text).my_sig_info == expected
+
+
+@pytest.mark.parametrize(
+    ("operator_text", "expected"),
+    [
+        ("sm6y", "SM6Y"),
+        ("Sm6y", "SM6Y"),
+        ("SM6Y", "SM6Y"),
+    ],
+)
+def test_qso_operator_is_normalized_to_uppercase(operator_text: str, expected: str) -> None:
+    assert _qso(operator=operator_text).operator == expected

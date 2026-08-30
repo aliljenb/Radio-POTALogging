@@ -20,6 +20,7 @@ from radio_pota_logging.infrastructure.repositories.file_logging_session_reposit
 )
 
 from .main_window import MainWindow
+from .session_bootstrap import bootstrap_session
 
 
 def main() -> int:
@@ -27,10 +28,17 @@ def main() -> int:
     exporter = AdifFileExporter()
 
     app = QApplication(sys.argv)
-    window = MainWindow(
+
+    initial_result = bootstrap_session(
         check_for_resumable_session=CheckForResumableSessionQuery(repository),
         resume_session=ResumeSessionCommand(repository),
         start_new_session=StartNewSessionCommand(repository),
+    )
+    if initial_result is None:
+        return 0
+
+    window = MainWindow(
+        initial_result=initial_result,
         submit_qso=SubmitQsoCommand(repository),
         generate_adif=GenerateAdifCommand(repository, exporter),
     )

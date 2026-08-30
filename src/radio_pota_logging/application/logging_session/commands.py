@@ -93,12 +93,19 @@ class ResumeSessionCommand:
 class StartNewSessionCommand:
     repository: LoggingSessionRepository
 
-    def execute(self, *, qso_date: date, time_on: time) -> SessionStartResult:
+    def execute(
+        self, *, qso_date: date, time_on: time, park_reference: str, freq: str
+    ) -> SessionStartResult:
         existing = self.repository.find_unfinished()
         if existing is not None:
             self.repository.archive(existing)
 
-        session = LoggingSession.start(StationDefaults(), QsoTimestamp(qso_date, time_on))
+        session = LoggingSession.start(
+            StationDefaults(),
+            QsoTimestamp(qso_date, time_on),
+            my_sig_info=park_reference,
+            freq=freq,
+        )
         self.repository.save(session)
         return SessionStartResult(
             entry_defaults=_to_entry_defaults_dto(session.next_entry_defaults),

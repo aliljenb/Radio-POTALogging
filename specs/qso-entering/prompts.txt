@@ -30,3 +30,38 @@ Revisit my answers under "Open Questions / Risks" in design.md and update and/or
 ------------------------------
 The CALL entry field shall only show capital letters, regardless what the computers keyboard is set to.
 The CALL field in the generated ADIF file shall also only have capital letters.
+------------------------------
+When starting a clean session, the application shall show a modal dialog, where the operator shall fill in:
+- "POTA park reference number", which shall end up in the MY_SIG_INFO field in the main dialog.
+- "Date", which shall end up in the QSO_DATE field in the main dialog.
+- "Time of first QSO", which shall end up in the TIME_ON field in the main dialog.
+When the operator clicks "OK", the initial modal dialog shall close and the entered values shall propagate to the corresponding fields in the main dialog.
+If the operator instead clicks "Quit", the application shall exit.
+------------------------------
+The modal dialog on a clean session shall also have a "Frequency" field, which shall end up in the FREQ field in the main dialog.
+------------------------------
+The modal dialog's "POTA park reference number" shall only show capital letters (same behavior as CALL in the main dialog).
+The MY_SIG_INFO field in the generated ADIF file shall also only have capital letters.
+------------------------------
+The OPERATOR entry field shall only show capital letters (same behavior as CALL).
+The MODE field shall be a dropdown list instead of a text field with the two options "CW" and "SSB", where "CW" is the default choice.
+If the operator changes the MODE, it shall be remembered to the next QSO entry (same behavior as most fields).
+------------------------------
+The main dialog's initial size shall be half the computer's window size.
+When the operator has entered a CALL and presses enter, the QSO shall be submitted (as if he clicked "Submit").
+------------------------------
+Story 2 change: The two fields RST_SENT and RST_RCVD shall both be reset to "599" regardless of the just-submitted QSO.
+Story 10 change: WHEN the main window (the QSO entry form and log list) is created, THE SYSTEM SHALL set its initial size to half the primary display's width and 3/4 the primary display's height.
+The main dialog's entry fields shall have the following display and TAB order:
+1. CALL
+2. RST_RCVD
+3. RST_SENT
+4. TIME_ON
+5. FREQ
+6. MY_SIG_INFO
+7. QSO_DATE
+8. MODE
+9. OPERATOR
+10. MY_RIG
+11. TX_PWR
+------------------------------

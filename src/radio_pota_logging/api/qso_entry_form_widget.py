@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 from datetime import date, time
+from typing import cast
 
-from PyQt6.QtCore import QDate, QTime, pyqtSignal
+from PyQt6.QtCore import QDate, QEvent, QObject, Qt, QTime, pyqtSignal
+from PyQt6.QtGui import QKeyEvent
 from PyQt6.QtWidgets import (
+    QComboBox,
     QDateEdit,
     QFormLayout,
     QLabel,
@@ -16,7 +19,13 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from radio_pota_logging.application.logging_session.dto import EntryDefaultsDto, SubmitQsoRequest
+from radio_pota_logging.application.logging_session.dto import (
+    MODE_OPTIONS,
+    EntryDefaultsDto,
+    SubmitQsoRequest,
+)
+
+from .uppercase_field import uppercase_as_typed
 
 
 class QsoEntryFormWidget(QWidget):
@@ -28,49 +37,70 @@ class QsoEntryFormWidget(QWidget):
         super().__init__(parent)
 
         self._call = QLineEdit()
-        self._call.textEdited.connect(self._uppercase_call)
+        uppercase_as_typed(self._call)
+        self._rst_rcvd = QLineEdit()
+        self._rst_sent = QLineEdit()
+        self._time_on = QTimeEdit()
+        self._freq = QLineEdit()
+        self._my_sig_info = QLineEdit()
+        uppercase_as_typed(self._my_sig_info)
         self._qso_date = QDateEdit()
         self._qso_date.setCalendarPopup(True)
-        self._time_on = QTimeEdit()
-        self._mode = QLineEdit()
-        self._my_sig_info = QLineEdit()
-        self._rst_sent = QLineEdit()
-        self._rst_rcvd = QLineEdit()
-        self._freq = QLineEdit()
+        self._mode = QComboBox()
+        self._mode.addItems(MODE_OPTIONS)
         self._operator = QLineEdit()
+        uppercase_as_typed(self._operator)
         self._my_rig = QLineEdit()
         self._tx_pwr = QLineEdit()
         self._error_label = QLabel()
         self._error_label.setStyleSheet("color: red;")
         self._error_label.hide()
 
-        form = QFormLayout()
-        form.addRow("CALL", self._call)
-        form.addRow("QSO_DATE", self._qso_date)
-        form.addRow("TIME_ON", self._time_on)
-        form.addRow("MODE", self._mode)
-        form.addRow("MY_SIG_INFO", self._my_sig_info)
-        form.addRow("RST_SENT", self._rst_sent)
-        form.addRow("RST_RCVD", self._rst_rcvd)
-        form.addRow("FREQ", self._freq)
-        form.addRow("OPERATOR", self._operator)
-        form.addRow("MY_RIG", self._my_rig)
-        form.addRow("TX_PWR", self._tx_pwr)
+        self._form = QFormLayout()
+        self._form.addRow("CALL", self._call)
+        self._form.addRow("RST_RCVD", self._rst_rcvd)
+        self._form.addRow("RST_SENT", self._rst_sent)
+        self._form.addRow("TIME_ON", self._time_on)
+        self._form.addRow("FREQ", self._freq)
+        self._form.addRow("MY_SIG_INFO", self._my_sig_info)
+        self._form.addRow("QSO_DATE", self._qso_date)
+        self._form.addRow("MODE", self._mode)
+        self._form.addRow("OPERATOR", self._operator)
+        self._form.addRow("MY_RIG", self._my_rig)
+        self._form.addRow("TX_PWR", self._tx_pwr)
 
         submit_button = QPushButton("Submit")
         submit_button.clicked.connect(self._on_submit_clicked)
 
         layout = QVBoxLayout()
         layout.addWidget(self._error_label)
-        layout.addLayout(form)
+        layout.addLayout(self._form)
         layout.addWidget(submit_button)
         self.setLayout(layout)
+
+        self._fields = [
+            self._call,
+            self._rst_rcvd,
+            self._rst_sent,
+            self._time_on,
+            self._freq,
+            self._my_sig_info,
+            self._qso_date,
+            self._mode,
+            self._operator,
+            self._my_rig,
+            self._tx_pwr,
+        ]
+        for field in self._fields:
+            field.installEventFilter(self)
+        for earlier, later in zip(self._fields, self._fields[1:], strict=False):
+            QWidget.setTabOrder(earlier, later)
 
     def apply_defaults(self, defaults: EntryDefaultsDto) -> None:
         self._call.clear()
         self._qso_date.setDate(_to_qdate(defaults.qso_date))
         self._time_on.setTime(_to_qtime(defaults.time_on))
-        self._mode.setText(defaults.mode)
+        self._mode.setCurrentText(defaults.mode)
         self._my_sig_info.setText(defaults.my_sig_info)
         self._rst_sent.setText(defaults.rst_sent)
         self._rst_rcvd.setText(defaults.rst_rcvd)
@@ -80,11 +110,6 @@ class QsoEntryFormWidget(QWidget):
         self._tx_pwr.setText(defaults.tx_pwr)
         self._call.setFocus()
 
-    def _uppercase_call(self, text: str) -> None:
-        cursor_position = self._call.cursorPosition()
-        self._call.setText(text.upper())
-        self._call.setCursorPosition(cursor_position)
-
     def show_error(self, message: str) -> None:
         self._error_label.setText(message)
         self._error_label.show()
@@ -93,6 +118,18 @@ class QsoEntryFormWidget(QWidget):
         self._error_label.clear()
         self._error_label.hide()
 
+    def eventFilter(self, obj: QObject | None, event: QEvent | None) -> bool:  # noqa: N802
+        if event is not None and event.type() == QEvent.Type.KeyPress:
+            key_event = cast(QKeyEvent, event)
+            if key_event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+                self._on_enter_pressed()
+                return True
+        return super().eventFilter(obj, event)
+
+    def _on_enter_pressed(self) -> None:
+        if self._call.text():
+            self._on_submit_clicked()
+
     def _on_submit_clicked(self) -> None:
         qso_date_value = self._qso_date.date()
         time_on_value = self._time_on.time()
@@ -100,7 +137,7 @@ class QsoEntryFormWidget(QWidget):
             call=self._call.text(),
             qso_date=date(qso_date_value.year(), qso_date_value.month(), qso_date_value.day()),
             time_on=time(time_on_value.hour(), time_on_value.minute(), time_on_value.second()),
-            mode=self._mode.text(),
+            mode=self._mode.currentText(),
             my_sig_info=self._my_sig_info.text(),
             rst_sent=self._rst_sent.text(),
             rst_rcvd=self._rst_rcvd.text(),

@@ -27,11 +27,19 @@ class LoggingSession:
         return hash(self.session_id)
 
     @classmethod
-    def start(cls, station_defaults: StationDefaults, now: QsoTimestamp) -> LoggingSession:
+    def start(
+        cls,
+        station_defaults: StationDefaults,
+        now: QsoTimestamp,
+        my_sig_info: str = "",
+        freq: str = "",
+    ) -> LoggingSession:
         return cls(
             session_id=SessionId.generate(),
             qsos=(),
-            next_entry_defaults=EntryDefaults.seed(station_defaults, now),
+            next_entry_defaults=EntryDefaults.seed(
+                station_defaults, now, my_sig_info=my_sig_info, freq=freq
+            ),
         )
 
     def record_qso(
@@ -74,8 +82,8 @@ class LoggingSession:
             operator=operator,
             mode=mode,
             my_sig_info=my_sig_info,
-            rst_sent=rst_sent,
-            rst_rcvd=rst_rcvd,
+            rst_sent=StationDefaults.rst_sent,
+            rst_rcvd=StationDefaults.rst_rcvd,
             freq=str(frequency.megahertz),
             my_rig=my_rig,
             tx_pwr=tx_pwr,

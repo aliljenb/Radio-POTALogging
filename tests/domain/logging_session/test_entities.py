@@ -20,6 +20,20 @@ def test_start_seeds_defaults_and_empty_qso_list() -> None:
     assert session.next_entry_defaults.freq == ""
 
 
+def test_start_seeds_my_sig_info_from_given_park_reference() -> None:
+    session = LoggingSession.start(
+        StationDefaults(), QsoTimestamp(date(2026, 8, 30), time(9, 0)), my_sig_info="K-1234"
+    )
+    assert session.next_entry_defaults.my_sig_info == "K-1234"
+
+
+def test_start_seeds_freq_from_given_frequency() -> None:
+    session = LoggingSession.start(
+        StationDefaults(), QsoTimestamp(date(2026, 8, 30), time(9, 0)), freq="14.062"
+    )
+    assert session.next_entry_defaults.freq == "14.062"
+
+
 def test_record_qso_sets_time_off_equal_to_time_on_and_fixed_my_sig() -> None:
     session = _new_session()
     qso = session.record_qso(
@@ -90,6 +104,61 @@ def test_record_qso_carries_defaults_forward_except_call_and_advances_time_on() 
     assert defaults.my_sig_info == "K-1234"
     assert defaults.freq == "14.062"
     assert defaults.timestamp == QsoTimestamp(date(2026, 8, 30), time(12, 2))
+
+
+def test_record_qso_normalizes_carried_forward_my_sig_info_to_uppercase() -> None:
+    session = _new_session()
+    session.record_qso(
+        call="W1AW",
+        qso_date=date(2026, 8, 30),
+        time_on=time(12, 0),
+        mode="CW",
+        my_sig_info="k-1234",
+        rst_sent="599",
+        rst_rcvd="599",
+        freq="14.062",
+        operator="SM6Y",
+        my_rig="Elecraft KX2",
+        tx_pwr="5",
+    )
+    assert session.next_entry_defaults.my_sig_info == "K-1234"
+
+
+def test_record_qso_normalizes_carried_forward_operator_to_uppercase() -> None:
+    session = _new_session()
+    session.record_qso(
+        call="W1AW",
+        qso_date=date(2026, 8, 30),
+        time_on=time(12, 0),
+        mode="CW",
+        my_sig_info="K-1234",
+        rst_sent="599",
+        rst_rcvd="599",
+        freq="14.062",
+        operator="sm6y",
+        my_rig="Elecraft KX2",
+        tx_pwr="5",
+    )
+    assert session.next_entry_defaults.operator == "SM6Y"
+
+
+def test_record_qso_resets_rst_sent_and_rst_rcvd_instead_of_carrying_them_forward() -> None:
+    session = _new_session()
+    session.record_qso(
+        call="W1AW",
+        qso_date=date(2026, 8, 30),
+        time_on=time(12, 0),
+        mode="CW",
+        my_sig_info="K-1234",
+        rst_sent="579",
+        rst_rcvd="588",
+        freq="14.062",
+        operator="SM6Y",
+        my_rig="Elecraft KX2",
+        tx_pwr="5",
+    )
+    assert session.next_entry_defaults.rst_sent == "599"
+    assert session.next_entry_defaults.rst_rcvd == "599"
 
 
 def test_record_qso_rejects_unparsable_frequency_and_leaves_state_unchanged() -> None:

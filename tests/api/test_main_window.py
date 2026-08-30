@@ -1,23 +1,31 @@
 from datetime import date, time
 from pathlib import Path
 
-import pytest
+from PyQt6.QtWidgets import QApplication
 from pytestqt.qtbot import QtBot
-from radio_pota_logging.api import main_window as main_window_module
 from radio_pota_logging.api.main_window import MainWindow
-from radio_pota_logging.api.session_resume_prompt_dialog import SessionResumeChoice
 from radio_pota_logging.application.logging_session.dto import (
     EntryDefaultsDto,
+    QsoDto,
     SessionStartResult,
-    SubmitQsoResult,
 )
+
+
+class FakeSubmitQsoCommand:
+    def execute(self, request: object) -> object:  # pragma: no cover - unused here
+        raise NotImplementedError
+
+
+class FakeGenerateAdifCommand:
+    def execute(self, destination: Path) -> None:  # pragma: no cover - unused here
+        raise NotImplementedError
 
 
 def _entry_defaults() -> EntryDefaultsDto:
     return EntryDefaultsDto(
         operator="SM6Y",
         mode="CW",
-        my_sig_info="",
+        my_sig_info="K-1234",
         rst_sent="599",
         rst_rcvd="599",
         freq="",
@@ -28,107 +36,64 @@ def _entry_defaults() -> EntryDefaultsDto:
     )
 
 
-class FakeCheckForResumableSessionQuery:
-    def __init__(self, value: bool) -> None:
-        self._value = value
-
-    def execute(self) -> bool:
-        return self._value
-
-
-class FakeResumeSessionCommand:
-    def __init__(self) -> None:
-        self.executed = False
-
-    def execute(self) -> SessionStartResult:
-        self.executed = True
-        return SessionStartResult(entry_defaults=_entry_defaults(), qsos=())
-
-
-class FakeStartNewSessionCommand:
-    def __init__(self) -> None:
-        self.executed = False
-        self.called_with: tuple[date, time] | None = None
-
-    def execute(self, *, qso_date: date, time_on: time) -> SessionStartResult:
-        self.executed = True
-        self.called_with = (qso_date, time_on)
-        return SessionStartResult(entry_defaults=_entry_defaults(), qsos=())
+def _qso_dto() -> QsoDto:
+    return QsoDto(
+        call="W1AW",
+        qso_date=date(2026, 8, 30),
+        time_on=time(9, 0),
+        time_off=time(9, 0),
+        band="20M",
+        mode="CW",
+        my_sig="POTA",
+        my_sig_info="K-1234",
+        rst_sent="599",
+        rst_rcvd="599",
+        freq="14.062",
+        operator="SM6Y",
+        my_rig="Elecraft KX2",
+        tx_pwr="5",
+    )
 
 
-class FakeSubmitQsoCommand:
-    def execute(self, request: object) -> SubmitQsoResult:  # pragma: no cover - unused here
-        raise NotImplementedError
+def test_main_window_renders_the_given_session_start_result(qtbot: QtBot) -> None:
+    initial_result = SessionStartResult(entry_defaults=_entry_defaults(), qsos=(_qso_dto(),))
 
-
-class FakeGenerateAdifCommand:
-    def execute(self, destination: Path) -> None:  # pragma: no cover - unused here
-        raise NotImplementedError
-
-
-def _build_window(
-    qtbot: QtBot,
-    check: FakeCheckForResumableSessionQuery,
-    resume: FakeResumeSessionCommand,
-    start_new: FakeStartNewSessionCommand,
-) -> MainWindow:
     window = MainWindow(
-        check_for_resumable_session=check,  # type: ignore[arg-type]
-        resume_session=resume,  # type: ignore[arg-type]
-        start_new_session=start_new,  # type: ignore[arg-type]
+        initial_result=initial_result,
         submit_qso=FakeSubmitQsoCommand(),  # type: ignore[arg-type]
         generate_adif=FakeGenerateAdifCommand(),  # type: ignore[arg-type]
     )
     qtbot.addWidget(window)
-    return window
+
+    assert window.qso_list.rowCount() == 1
+    assert window.form._my_sig_info.text() == "K-1234"
 
 
-def test_no_prompt_and_starts_clean_when_no_resumable_session(
-    qtbot: QtBot, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    exec_calls = []
-    monkeypatch.setattr(
-        main_window_module.SessionResumePromptDialog, "exec", lambda self: exec_calls.append(1)
+def test_main_window_renders_an_empty_qso_list_for_a_brand_new_session(qtbot: QtBot) -> None:
+    initial_result = SessionStartResult(entry_defaults=_entry_defaults(), qsos=())
+
+    window = MainWindow(
+        initial_result=initial_result,
+        submit_qso=FakeSubmitQsoCommand(),  # type: ignore[arg-type]
+        generate_adif=FakeGenerateAdifCommand(),  # type: ignore[arg-type]
     )
-    resume = FakeResumeSessionCommand()
-    start_new = FakeStartNewSessionCommand()
+    qtbot.addWidget(window)
 
-    _build_window(qtbot, FakeCheckForResumableSessionQuery(False), resume, start_new)
-
-    assert exec_calls == []
-    assert start_new.executed
-    assert not resume.executed
+    assert window.qso_list.rowCount() == 0
 
 
-def test_prompt_shown_and_resume_invoked_when_resume_chosen(
-    qtbot: QtBot, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    def fake_exec(self: object) -> int:
-        self.choice = SessionResumeChoice.RESUME  # type: ignore[attr-defined]
-        return 0
+def test_main_window_sizes_itself_to_half_width_and_three_quarters_height(qtbot: QtBot) -> None:
+    initial_result = SessionStartResult(entry_defaults=_entry_defaults(), qsos=())
 
-    monkeypatch.setattr(main_window_module.SessionResumePromptDialog, "exec", fake_exec)
-    resume = FakeResumeSessionCommand()
-    start_new = FakeStartNewSessionCommand()
+    window = MainWindow(
+        initial_result=initial_result,
+        submit_qso=FakeSubmitQsoCommand(),  # type: ignore[arg-type]
+        generate_adif=FakeGenerateAdifCommand(),  # type: ignore[arg-type]
+    )
+    qtbot.addWidget(window)
 
-    _build_window(qtbot, FakeCheckForResumableSessionQuery(True), resume, start_new)
-
-    assert resume.executed
-    assert not start_new.executed
-
-
-def test_prompt_shown_and_start_clean_invoked_when_start_clean_chosen(
-    qtbot: QtBot, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    def fake_exec(self: object) -> int:
-        self.choice = SessionResumeChoice.START_CLEAN  # type: ignore[attr-defined]
-        return 0
-
-    monkeypatch.setattr(main_window_module.SessionResumePromptDialog, "exec", fake_exec)
-    resume = FakeResumeSessionCommand()
-    start_new = FakeStartNewSessionCommand()
-
-    _build_window(qtbot, FakeCheckForResumableSessionQuery(True), resume, start_new)
-
-    assert start_new.executed
-    assert not resume.executed
+    screen = QApplication.primaryScreen()
+    assert screen is not None
+    geometry = screen.availableGeometry()
+    assert window.size().width() == geometry.width() // 2
+    assert window.size().height() == geometry.height() * 3 // 4

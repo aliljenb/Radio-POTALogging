@@ -99,6 +99,10 @@ class StationDefaults:
     tx_pwr: str = "5"
 
 
+# The only two supported MODE values (requirements.md Story 9).
+MODE_OPTIONS: tuple[str, str] = ("CW", "SSB")
+
+
 @dataclass(frozen=True)
 class EntryDefaults:
     """Pre-fill template for the next entry form — every field except CALL."""
@@ -113,15 +117,25 @@ class EntryDefaults:
     tx_pwr: str
     timestamp: QsoTimestamp
 
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "my_sig_info", self.my_sig_info.upper())
+        object.__setattr__(self, "operator", self.operator.upper())
+
     @classmethod
-    def seed(cls, station_defaults: StationDefaults, now: QsoTimestamp) -> EntryDefaults:
+    def seed(
+        cls,
+        station_defaults: StationDefaults,
+        now: QsoTimestamp,
+        my_sig_info: str = "",
+        freq: str = "",
+    ) -> EntryDefaults:
         return cls(
             operator=station_defaults.operator,
             mode=station_defaults.mode,
-            my_sig_info="",
+            my_sig_info=my_sig_info,
             rst_sent=station_defaults.rst_sent,
             rst_rcvd=station_defaults.rst_rcvd,
-            freq="",
+            freq=freq,
             my_rig=station_defaults.my_rig,
             tx_pwr=station_defaults.tx_pwr,
             timestamp=now,
@@ -146,6 +160,8 @@ class Qso:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "call", self.call.upper())
+        object.__setattr__(self, "my_sig_info", self.my_sig_info.upper())
+        object.__setattr__(self, "operator", self.operator.upper())
 
     @property
     def time_off(self) -> time:

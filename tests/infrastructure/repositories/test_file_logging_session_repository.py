@@ -95,6 +95,86 @@ def test_find_unfinished_normalizes_a_legacy_lowercase_call(tmp_path: Path) -> N
     assert reloaded.qsos[0].call == "W1AW"
 
 
+def test_find_unfinished_normalizes_a_legacy_lowercase_my_sig_info(tmp_path: Path) -> None:
+    legacy_session = {
+        "session_id": str(uuid.uuid4()),
+        "qsos": [
+            {
+                "call": "W1AW",
+                "timestamp": {"qso_date": "2026-08-30", "time_on": "09:00:00"},
+                "mode": "CW",
+                "my_sig": "POTA",
+                "my_sig_info": "k-1234",
+                "rst_sent": "599",
+                "rst_rcvd": "599",
+                "freq": "14.062",
+                "operator": "SM6Y",
+                "my_rig": "Elecraft KX2",
+                "tx_pwr": "5",
+            }
+        ],
+        "next_entry_defaults": {
+            "operator": "SM6Y",
+            "mode": "CW",
+            "my_sig_info": "k-1234",
+            "rst_sent": "599",
+            "rst_rcvd": "599",
+            "freq": "14.062",
+            "my_rig": "Elecraft KX2",
+            "tx_pwr": "5",
+            "timestamp": {"qso_date": "2026-08-30", "time_on": "09:02:00"},
+        },
+    }
+    (tmp_path / ".qso_session.json").write_text(json.dumps(legacy_session))
+    repository = FileLoggingSessionRepository(tmp_path)
+
+    reloaded = repository.find_unfinished()
+
+    assert reloaded is not None
+    assert reloaded.qsos[0].my_sig_info == "K-1234"
+    assert reloaded.next_entry_defaults.my_sig_info == "K-1234"
+
+
+def test_find_unfinished_normalizes_a_legacy_lowercase_operator(tmp_path: Path) -> None:
+    legacy_session = {
+        "session_id": str(uuid.uuid4()),
+        "qsos": [
+            {
+                "call": "W1AW",
+                "timestamp": {"qso_date": "2026-08-30", "time_on": "09:00:00"},
+                "mode": "CW",
+                "my_sig": "POTA",
+                "my_sig_info": "K-1234",
+                "rst_sent": "599",
+                "rst_rcvd": "599",
+                "freq": "14.062",
+                "operator": "sm6y",
+                "my_rig": "Elecraft KX2",
+                "tx_pwr": "5",
+            }
+        ],
+        "next_entry_defaults": {
+            "operator": "sm6y",
+            "mode": "CW",
+            "my_sig_info": "K-1234",
+            "rst_sent": "599",
+            "rst_rcvd": "599",
+            "freq": "14.062",
+            "my_rig": "Elecraft KX2",
+            "tx_pwr": "5",
+            "timestamp": {"qso_date": "2026-08-30", "time_on": "09:02:00"},
+        },
+    }
+    (tmp_path / ".qso_session.json").write_text(json.dumps(legacy_session))
+    repository = FileLoggingSessionRepository(tmp_path)
+
+    reloaded = repository.find_unfinished()
+
+    assert reloaded is not None
+    assert reloaded.qsos[0].operator == "SM6Y"
+    assert reloaded.next_entry_defaults.operator == "SM6Y"
+
+
 def test_archive_without_a_saved_session_is_a_no_op(tmp_path: Path) -> None:
     session = LoggingSession.start(StationDefaults(), QsoTimestamp(date(2026, 8, 30), time(9, 0)))
     repository = FileLoggingSessionRepository(tmp_path)
