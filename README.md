@@ -6,9 +6,10 @@ log after a Parks On The Air (POTA) activation, and exporting them as an
 
 ## Status
 
-The `qso-entering` feature is implemented — see
-[`specs/qso-entering/`](specs/qso-entering/) for its requirements, design,
-and task breakdown.
+The `qso-entering` and `app-launcher` features are implemented — see
+[`specs/qso-entering/`](specs/qso-entering/) and
+[`specs/app-launcher/`](specs/app-launcher/) for their requirements,
+design, and task breakdowns.
 
 ## Requirements
 
@@ -36,6 +37,21 @@ in — the app persists the in-progress session as `.qso_session.json` in
 its launch directory, and asks whether to resume or start clean if it
 finds one left over from a previous run.
 
+### macOS Dock launcher
+
+`macos/POTA QSO Logging.app` is a double-clickable launcher for this
+machine: drag it into the Dock or `/Applications` and open it like any
+other Mac app — no terminal needed. It always runs the app with
+`~/POTA Logs` as its working directory (creating that folder if needed),
+so the session file and any generated ADIF exports land there
+consistently regardless of how the app was started. If the project's
+`.venv` is missing, or the app exits unexpectedly, it shows a native
+alert; unexpected-exit output is captured to `~/POTA Logs/launcher.log`.
+
+This launcher is a thin wrapper hardcoded to this project's path on this
+machine — it isn't relocatable to another Mac or user account. See
+[`specs/app-launcher/design.md`](specs/app-launcher/design.md) for details.
+
 ## Development
 
 ```bash
@@ -56,7 +72,8 @@ QT_QPA_PLATFORM=offscreen pytest
 
 ```
 src/radio_pota_logging/   # package code (domain / application / infrastructure / api)
-tests/                     # pytest suite (mirrors src/)
+macos/                     # macOS .app launcher bundle (this machine only)
+tests/                     # pytest suite (mirrors src/ and macos/)
 specs/<feature>/           # requirements.md, design.md, tasks.md
 docs/domain/               # ubiquitous language glossary and bounded contexts
 .claude/                   # spec-driven development workflow and steering rules
