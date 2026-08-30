@@ -1,0 +1,2 @@
+As an operator, I want a clickable local launcher for this application.
+It should work in MacOS and be possible to reach from the dock.
