@@ -1,0 +1,22 @@
+#!/bin/sh
+PROJECT_DIR="${POTA_LAUNCHER_PROJECT_DIR:-/Volumes/iMac-Extended-01/Projects_EXT/Python/Radio-POTALogging}"
+PYTHON="$PROJECT_DIR/.venv/bin/python"
+LOGS_DIR="$HOME/POTA Logs"
+LOG_FILE="$LOGS_DIR/launcher.log"
+
+if [ ! -x "$PYTHON" ]; then
+    osascript -e 'display alert "POTA QSO Logging" message "The project'\''s virtual environment (.venv) was not found at '"$PROJECT_DIR"'. Follow the setup steps in the project README, then try again." as critical'
+    exit 1
+fi
+
+mkdir -p "$LOGS_DIR"
+cd "$LOGS_DIR" || exit 1
+
+"$PYTHON" -m radio_pota_logging.api.composition_root > "$LOG_FILE" 2>&1
+exit_code=$?
+
+if [ "$exit_code" -ne 0 ]; then
+    osascript -e 'display alert "POTA QSO Logging" message "The application exited unexpectedly (exit code '"$exit_code"'). See '"$LOG_FILE"' for details." as critical'
+fi
+
+exit "$exit_code"

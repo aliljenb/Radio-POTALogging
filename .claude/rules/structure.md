@@ -30,6 +30,12 @@
 ├── frontend/                       # not used by this project — see note below
 │   ├── src/
 │   └── package.json
+├── macos/                          # macOS .app bundle launcher(s); no Python source, see note below
+│   └── POTA QSO Logging.app/
+│       └── Contents/
+│           ├── Info.plist
+│           └── MacOS/
+│               └── launch
 ├── specs/
 │   ├── <feature-name-1>/
 │   │   ├── requirements.md
@@ -55,6 +61,7 @@
 │   │   └── repositories/           # concrete repo implementations — the "adapters"
 │   └── api/                        # presentation layer: PyQt windows/widgets, DI wiring
 ├── tests/
+│   └── macos/                      # tests for macos/ launcher scripts (mirrors macos/, not src/)
 ├── .gitignore
 ├── pyproject.toml
 └── README.md
@@ -69,6 +76,10 @@
   (see `.claude/rules/tech.md` decision log, 2026-08-30)
 - There is no ORM/database, so `infrastructure/` has no `db/` subfolder —
   persistence is file-based, under `infrastructure/repositories/`
-- Test files mirror the backend source tree
+- `macos/` holds OS-level launcher bundles (plain shell script + Info.plist,
+  no Python) for this machine only — see `specs/app-launcher/design.md`;
+  it is not part of the `src/<python_module>/` package or its DDD layering
+- Test files mirror the backend source tree; `tests/macos/` mirrors
+  `macos/` the same way
 - One spec directory per feature — specs are never shared across features
 - Steering documents live under `.claude/rules/`
