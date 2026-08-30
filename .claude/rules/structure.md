@@ -27,7 +27,7 @@
 │   │   ├── backend.md                 # path-scoped: src/**/*.py
 │   │   └── frontend.md                # path-scoped: frontend/src/**/*
 │   └── CLAUDE.md                      # short, top-level index/entry point
-├── frontend/
+├── frontend/                       # not used by this project — see note below
 │   ├── src/
 │   └── package.json
 ├── specs/
@@ -52,9 +52,8 @@
 │   │   │   ├── queries.py          # read use cases
 │   │   │   └── dto.py              # data transfer objects crossing the boundary
 │   ├── infrastructure/             # everything that talks to the outside world
-│   │   ├── db/                     # ORM models, migrations, session management
 │   │   └── repositories/           # concrete repo implementations — the "adapters"
-│   └── api/                        # FastAPI routers, request/response schemas, DI wiring
+│   └── api/                        # presentation layer: PyQt windows/widgets, DI wiring
 ├── tests/
 ├── .gitignore
 ├── pyproject.toml
@@ -64,7 +63,12 @@
 ## Conventions
 
 - All backend source code lives under `src/<python_module>/`
-- All frontend source code lives under `frontend/src`
+- This project is a PyQt desktop GUI, not a web app: `frontend/` is unused
+  template scaffolding, and `src/<python_module>/api/` holds the PyQt
+  presentation layer (windows/widgets/DI wiring) instead of HTTP routes
+  (see `.claude/rules/tech.md` decision log, 2026-08-30)
+- There is no ORM/database, so `infrastructure/` has no `db/` subfolder —
+  persistence is file-based, under `infrastructure/repositories/`
 - Test files mirror the backend source tree
 - One spec directory per feature — specs are never shared across features
 - Steering documents live under `.claude/rules/`

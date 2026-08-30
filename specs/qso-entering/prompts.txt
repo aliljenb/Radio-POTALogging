@@ -1,0 +1,30 @@
+## Introduction
+As an operator, coming back from a portable "Parks On The Air" (POTA) radio session, I want to be able to enter my QSOs (contacts) easily, one-by-one from my paper log.
+The end-goal is to produce a log file in the ADIF format (https://adif.org/adif).
+
+## QSO Entry Form
+When the operator is presented with the first entry form, the following fields are shown:
+CALL, QSO_DATE, TIME_ON, MODE, MY_SIG_INFO, RST_SENT, RST_RCVD, FREQ, OPERATOR, MY_RIG, TX_PWR.
+
+The following fields shall be pre-filled (but editable) with values from application constants:
+OPERATOR (="SM6Y"), MODE (="CW"), MY_SIG (="POTA"), RST_SENT (="599"), RST_RCVD (="599"), MY_RIG (="Elecraft KX2"), TX_PWR (="5").
+If the operator changes any of these pre-filled fields, the new values shall be remembered and propagated to the next entry.
+
+## QSO Submission
+When the operator submits a QSO, TIME_OFF shall be set to the same value as TIME_ON and all the fields for the log file shall be stored.
+The submitted QSO shall be displayed last in a QSO list, and below the list the operator shall be able to enter the next QSO.
+On the next QSO entry, all values from the previous QSO entry shall be remembered and pre-filled, except the following fields:
+CALL, TIME_ON
+The "CALL" field (which shall be empty) shall have focus.
+"TIME_ON" shall be incremented by 2 minutes from the previous QSO entry.
+
+## Log file creation
+The produced log file shall only contain the following fields:
+OPERATOR, CALL, QSO_DATE, TIME_ON, TIME_OFF, BAND, MODE, MY_SIG, MY_SIG_INFO, RST_SENT, RST_RCVD, FREQ, MY_RIG, TX_PWR.
+At any time, the operator shall be able to click on "Generate ADIF".
+When the operator clicks "Generate ADIF", a file containing all entered QSOs shall be created with the ADIF format.
+------------------------------
+Revisit the answers to "Open questions" in requirements.md and update requirements accordingly
+------------------------------
+Revisit my answers under "Open Questions / Risks" in design.md and update and/or act accordingly
+------------------------------

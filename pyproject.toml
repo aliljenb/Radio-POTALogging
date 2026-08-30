@@ -1,11 +1,16 @@
 [project]
 name = "Radio-POTALogging"
 version = "0.1.0"
+dependencies = ["PyQt6"]
 
 [project.optional-dependencies]
-dev = ["pytest"]
+dev = ["pytest", "pytest-cov", "pytest-qt", "ruff", "mypy"]
 
 [tool.pytest.ini_options]
+pythonpath = ["src"]
 markers = [
     "smoke: marks a test as a smoke test",
 ]
+
+[tool.mypy]
+mypy_path = "src"
