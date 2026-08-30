@@ -9,9 +9,26 @@ from radio_pota_logging.domain.logging_session.value_objects import (
     Band,
     EntryDefaults,
     Frequency,
+    Qso,
     QsoTimestamp,
     StationDefaults,
 )
+
+
+def _qso(call: str) -> Qso:
+    return Qso(
+        call=call,
+        timestamp=QsoTimestamp(date(2026, 8, 30), time(9, 0)),
+        mode="CW",
+        my_sig="POTA",
+        my_sig_info="K-1234",
+        rst_sent="599",
+        rst_rcvd="599",
+        freq=Frequency.parse("14.062"),
+        operator="SM6Y",
+        my_rig="Elecraft KX2",
+        tx_pwr="5",
+    )
 
 
 @pytest.mark.parametrize(
@@ -81,3 +98,16 @@ def test_entry_defaults_seed_leaves_my_sig_info_and_freq_empty() -> None:
     assert defaults.my_rig == "Elecraft KX2"
     assert defaults.tx_pwr == "5"
     assert defaults.timestamp == now
+
+
+@pytest.mark.parametrize(
+    ("call_text", "expected"),
+    [
+        ("w1aw", "W1AW"),
+        ("W1aw", "W1AW"),
+        ("sm6y/p", "SM6Y/P"),
+        ("K1ABC", "K1ABC"),
+    ],
+)
+def test_qso_call_is_normalized_to_uppercase(call_text: str, expected: str) -> None:
+    assert _qso(call_text).call == expected

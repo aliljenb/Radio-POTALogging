@@ -18,6 +18,16 @@ every submission so a crash or restart never loses a QSO. "Generate ADIF"
 is a separate, idempotent read of the current session's QSOs through an
 `AdifExporter` port, independent of whether an entry is in progress.
 
+**Amendment (Story 5, added after initial implementation)**: CALL is
+always uppercase. This is enforced in exactly two places — the `Qso`
+value object itself (so every `Qso`, however constructed, has an
+uppercase `call`: freshly submitted, or loaded back from a resumed
+session file that predates this change) and the entry form's CALL field
+(so the operator sees uppercase as they type, before submission even
+happens). Because the value object itself enforces it, neither
+`FileLoggingSessionRepository` nor `AdifFileExporter` need any change —
+by the time either sees a `Qso`, its `call` is already normalized.
+
 ## Domain Model
 
 > Pure business logic. Zero framework/infra imports. Lives under
@@ -56,7 +66,7 @@ is a separate, idempotent read of the current session's QSOs through an
 | `QsoTimestamp` | `qso_date: date`, `time_on: time` (both UTC, no tz conversion) | `.plus_two_minutes()` returns a new `QsoTimestamp`, using `datetime` arithmetic so a midnight rollover advances `qso_date` for free |
 | `StationDefaults` | `operator, mode, my_sig, rst_sent, rst_rcvd, my_rig, tx_pwr` | fixed application constants (`SM6Y`, `CW`, `POTA`, `599`, `599`, `Elecraft KX2`, `5`); immutable, defined once in the domain layer |
 | `EntryDefaults` | `operator, mode, my_sig_info, rst_sent, rst_rcvd, freq, my_rig, tx_pwr, timestamp: QsoTimestamp` (everything a future form pre-fills **except CALL**) | Two ways to obtain one: `EntryDefaults.seed(StationDefaults, now)` (QSO_DATE/TIME_ON = now, MY_SIG_INFO/FREQ empty) for a brand-new session, or `LoggingSession.record_qso(...)` derives the next one by carrying every field forward from the just-submitted QSO and advancing the timestamp by 2 minutes |
-| `Qso` | `call, timestamp: QsoTimestamp, mode, my_sig, my_sig_info, rst_sent, rst_rcvd, freq: Frequency, operator, my_rig, tx_pwr` | Immutable once created via `LoggingSession.record_qso`; `time_off` is always read as equal to `timestamp.time_on` (no separate stored field, so the invariant can't drift); `band` is a derived property (`freq.band`), never stored redundantly |
+| `Qso` | `call, timestamp: QsoTimestamp, mode, my_sig, my_sig_info, rst_sent, rst_rcvd, freq: Frequency, operator, my_rig, tx_pwr` | Immutable once created via `LoggingSession.record_qso`; `time_off` is always read as equal to `timestamp.time_on` (no separate stored field, so the invariant can't drift); `band` is a derived property (`freq.band`), never stored redundantly; **`call` is normalized to uppercase in `__post_init__`** (`object.__setattr__`, since the dataclass is frozen) — non-letter characters (digits, `/`) pass through unchanged because `str.upper()` only affects cased characters; this runs for every `Qso`, including ones deserialized from a persisted session file (requirements Story 5) |
 
 ### Domain Events
 
@@ -189,7 +199,7 @@ satisfying "without discarding the previous session's persisted file."
 |-----------|-----------------|------------------------|
 | `MainWindow` | Host the form, the QSO list, and the "Generate ADIF" action; run the startup resume/start-clean flow | `CheckForResumableSessionQuery`, `ResumeSessionCommand`, `StartNewSessionCommand` |
 | `SessionResumePromptDialog` | Ask the operator, once at startup, to resume or start clean | none (pure dialog; the choice drives which command `MainWindow` calls) |
-| `QsoEntryFormWidget` | Render the 11 entry fields and emit the submitted values; apply a new `EntryDefaultsDto` to pre-fill itself and focus CALL | emits `SubmitQsoRequest` via a Qt signal |
+| `QsoEntryFormWidget` | Render the 11 entry fields and emit the submitted values; apply a new `EntryDefaultsDto` to pre-fill itself and focus CALL; uppercase CALL live as the operator types (`textEdited`, preserving cursor position) so it displays correctly before submission (requirements Story 5) | emits `SubmitQsoRequest` via a Qt signal |
 | `QsoListWidget` | Display submitted QSOs, in order, read-only | renders `QsoDto` rows appended to it |
 | `QsoEntryController` | Wire widget signals to application commands/queries and route results/errors back to the widgets | `SubmitQsoCommand`, `GenerateAdifCommand` |
 | `composition_root.py` (`main`) | Construct the concrete adapters (`FileLoggingSessionRepository`, `AdifFileExporter`) and wire them into the commands/`MainWindow` at startup | — |
@@ -233,7 +243,9 @@ Mirrors `src/` under `tests/`.
   all rows), `QsoTimestamp.plus_two_minutes()` (including a midnight
   rollover case), and `LoggingSession.record_qso` (TIME_OFF==TIME_ON,
   defaults carried forward correctly except CALL, first-entry seeding from
-  `StationDefaults`).
+  `StationDefaults`). Story 5: `Qso(call="w1aw/p", ...).call ==
+  "W1AW/P"` — mixed case and lowercase input normalized, digits and `/`
+  unaffected.
 - **Application** (`tests/application/logging_session/`): each command/query
   tested against fake `LoggingSessionRepository`/`AdifExporter` doubles —
   no real file I/O.
@@ -241,14 +253,19 @@ Mirrors `src/` under `tests/`.
   round-trips (save → find_unfinished, archive renames without deleting)
   against a temp directory; `AdifFileExporter` output checked against a
   golden ADIF sample for a couple of representative QSOs (including a
-  band-boundary frequency).
+  band-boundary frequency). Story 5: a session JSON file with a
+  lowercase-stored `call` (simulating data from before this change) is
+  loaded via `find_unfinished()` and asserted to come back uppercase,
+  since normalization happens in `Qso.__post_init__` on construction
+  regardless of where the value came from.
 - **GUI** (`tests/api/`): widget-level tests using **pytest-qt** (approved
   exception to `.claude/rules/testing.md`'s Playwright rule for this
   feature — Playwright cannot drive a PyQt window; recorded in
   `.claude/rules/tech.md`'s decision log). Cover: form pre-fill on
   `EntryDefaultsDto` application, focus-on-CALL after submit, the
-  resume/start-clean dialog choice invoking the right command, and an
-  inline error appearing (form preserved) when `SubmitQsoCommand` raises.
+  resume/start-clean dialog choice invoking the right command, an inline
+  error appearing (form preserved) when `SubmitQsoCommand` raises, and
+  (Story 5) typing lowercase into CALL displays uppercase immediately.
 
 ## Open Questions / Risks
 

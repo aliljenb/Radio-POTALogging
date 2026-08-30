@@ -144,6 +144,9 @@ class Qso:
     my_rig: str
     tx_pwr: str
 
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "call", self.call.upper())
+
     @property
     def time_off(self) -> time:
         return self.timestamp.time_on

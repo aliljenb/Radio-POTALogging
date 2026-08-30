@@ -58,6 +58,16 @@ def test_submit_button_emits_request_with_typed_values(qtbot: QtBot) -> None:
     assert request.time_on == time(9, 0)
 
 
+def test_typing_lowercase_into_call_displays_uppercase(qtbot: QtBot) -> None:
+    widget = QsoEntryFormWidget()
+    qtbot.addWidget(widget)
+    widget.show()
+
+    qtbot.keyClicks(widget._call, "w1aw/p")
+
+    assert widget._call.text() == "W1AW/P"
+
+
 def test_show_error_then_clear_error(qtbot: QtBot) -> None:
     widget = QsoEntryFormWidget()
     qtbot.addWidget(widget)

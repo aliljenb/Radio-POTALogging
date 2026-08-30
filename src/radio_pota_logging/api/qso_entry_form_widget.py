@@ -28,6 +28,7 @@ class QsoEntryFormWidget(QWidget):
         super().__init__(parent)
 
         self._call = QLineEdit()
+        self._call.textEdited.connect(self._uppercase_call)
         self._qso_date = QDateEdit()
         self._qso_date.setCalendarPopup(True)
         self._time_on = QTimeEdit()
@@ -78,6 +79,11 @@ class QsoEntryFormWidget(QWidget):
         self._my_rig.setText(defaults.my_rig)
         self._tx_pwr.setText(defaults.tx_pwr)
         self._call.setFocus()
+
+    def _uppercase_call(self, text: str) -> None:
+        cursor_position = self._call.cursorPosition()
+        self._call.setText(text.upper())
+        self._call.setCursorPosition(cursor_position)
 
     def show_error(self, message: str) -> None:
         self._error_label.setText(message)

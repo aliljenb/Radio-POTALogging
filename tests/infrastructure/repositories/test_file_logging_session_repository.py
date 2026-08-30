@@ -1,3 +1,5 @@
+import json
+import uuid
 from datetime import date, time
 from pathlib import Path
 
@@ -52,6 +54,45 @@ def test_archive_renames_file_without_deleting_data(tmp_path: Path) -> None:
     archived_files = list(tmp_path.glob(".qso_session.*.json"))
     assert len(archived_files) == 1
     assert archived_files[0].read_text() != ""
+
+
+def test_find_unfinished_normalizes_a_legacy_lowercase_call(tmp_path: Path) -> None:
+    legacy_session = {
+        "session_id": str(uuid.uuid4()),
+        "qsos": [
+            {
+                "call": "w1aw",
+                "timestamp": {"qso_date": "2026-08-30", "time_on": "09:00:00"},
+                "mode": "CW",
+                "my_sig": "POTA",
+                "my_sig_info": "K-1234",
+                "rst_sent": "599",
+                "rst_rcvd": "599",
+                "freq": "14.062",
+                "operator": "SM6Y",
+                "my_rig": "Elecraft KX2",
+                "tx_pwr": "5",
+            }
+        ],
+        "next_entry_defaults": {
+            "operator": "SM6Y",
+            "mode": "CW",
+            "my_sig_info": "K-1234",
+            "rst_sent": "599",
+            "rst_rcvd": "599",
+            "freq": "14.062",
+            "my_rig": "Elecraft KX2",
+            "tx_pwr": "5",
+            "timestamp": {"qso_date": "2026-08-30", "time_on": "09:02:00"},
+        },
+    }
+    (tmp_path / ".qso_session.json").write_text(json.dumps(legacy_session))
+    repository = FileLoggingSessionRepository(tmp_path)
+
+    reloaded = repository.find_unfinished()
+
+    assert reloaded is not None
+    assert reloaded.qsos[0].call == "W1AW"
 
 
 def test_archive_without_a_saved_session_is_a_no_op(tmp_path: Path) -> None:

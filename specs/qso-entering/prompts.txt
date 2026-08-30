@@ -28,3 +28,5 @@ Revisit the answers to "Open questions" in requirements.md and update requiremen
 ------------------------------
 Revisit my answers under "Open Questions / Risks" in design.md and update and/or act accordingly
 ------------------------------
+The CALL entry field shall only show capital letters, regardless what the computers keyboard is set to.
+The CALL field in the generated ADIF file shall also only have capital letters.

@@ -39,6 +39,11 @@ single, independently completable unit of work with a clear file target.
 - [x] `value_objects.py` — implement `Qso` (immutable; `time_off` reads as
       `timestamp.time_on`; `band` reads as `freq.band`) per design.md §
       Value Objects
+- [x] `value_objects.py` — **modify** `Qso`: add `__post_init__` that
+      normalizes `call` to uppercase (`object.__setattr__(self, "call",
+      self.call.upper())`, since the dataclass is frozen) per design.md §
+      Value Objects, Story 5 amendment. Runs for every `Qso`, including
+      ones deserialized from a persisted session file.
 - [x] `entities.py` — implement `LoggingSession` entity: `LoggingSession.start(station_defaults,
       now)` classmethod (seeds `next_entry_defaults`, empty `qsos`) and
       `record_qso(...)` method (constructs `Frequency`/`QsoTimestamp`,
@@ -107,6 +112,10 @@ Frontend Design section; this project has no `frontend/src`)
       the 11 entry fields, applies an `EntryDefaultsDto` to pre-fill
       itself and focus CALL, emits a `SubmitQsoRequest` via Qt signal on
       submit per design.md § Components
+- [x] `qso_entry_form_widget.py` — **modify** `QsoEntryFormWidget`: connect
+      the CALL field's `textEdited` signal to a handler that uppercases
+      the text in place, preserving cursor position, per design.md §
+      Components, Story 5 amendment.
 - [x] `qso_list_widget.py` — implement `QsoListWidget`: read-only, ordered
       display of appended `QsoDto` rows per design.md § Components
 - [x] `session_resume_prompt_dialog.py` — implement
@@ -143,6 +152,11 @@ N/A — this project has no `frontend/src`; see design.md § API Layer.
       strings raising `FrequencyFormatError`), `QsoTimestamp.plus_two_minutes()`
       (including a midnight-rollover case), and `EntryDefaults.seed()` per
       design.md § Testing Strategy
+- [x] `tests/domain/logging_session/test_value_objects.py` — **add** tests
+      for `Qso` CALL normalization (Story 5): lowercase and mixed-case
+      `call` input is uppercased (e.g. `Qso(call="w1aw/p", ...).call ==
+      "W1AW/P"`); digits and `/` are unaffected; per design.md § Testing
+      Strategy.
 - [x] `tests/domain/logging_session/test_entities.py` — unit tests for
       `LoggingSession.record_qso` (TIME_OFF==TIME_ON, `next_entry_defaults`
       carried forward correctly except CALL, first-entry seeding from
@@ -160,6 +174,13 @@ N/A — this project has no `frontend/src`; see design.md § API Layer.
       — integration tests for `FileLoggingSessionRepository` round-trips
       (`save` → `find_unfinished`, `archive` renames without deleting)
       against a temp directory per design.md § Testing Strategy
+- [x] `tests/infrastructure/repositories/test_file_logging_session_repository.py`
+      — **add** a test (Story 5): write a session JSON file with a
+      lowercase-stored `call` (simulating data saved before this change),
+      then assert `find_unfinished()` returns a `Qso` whose `call` is
+      uppercase, since normalization happens in `Qso.__post_init__` on
+      construction regardless of where the value came from; per design.md
+      § Testing Strategy.
 - [x] `tests/infrastructure/adif/test_adif_file_exporter.py` — tests for
       `AdifFileExporter.export()` against a golden ADIF sample for a
       couple of representative QSOs, including a band-boundary frequency,
@@ -168,6 +189,9 @@ N/A — this project has no `frontend/src`; see design.md § API Layer.
       `QsoEntryFormWidget`: pre-fill from an `EntryDefaultsDto`, CALL
       receives focus, submit emits the expected `SubmitQsoRequest` per
       design.md § Testing Strategy
+- [x] `tests/api/test_qso_entry_form_widget.py` — **add** a pytest-qt test
+      (Story 5): typing lowercase text into CALL displays it uppercase
+      immediately; per design.md § Testing Strategy.
 - [x] `tests/api/test_qso_list_widget.py` — pytest-qt tests for
       `QsoListWidget` rendering appended `QsoDto` rows in order per
       design.md § Testing Strategy
@@ -213,3 +237,17 @@ N/A — this project has no `frontend/src`; see design.md § API Layer.
   adapters into `MainWindow`.
 - Each test task depends on the implementation task(s) it covers, per the
   file each test task names above.
+
+### Story 5 amendment (added after initial implementation)
+
+- `value_objects.py`'s `Qso.__post_init__` modification has no dependency
+  on anything new (it modifies an already-implemented class) and must
+  land before its two test tasks: `test_value_objects.py`'s new CALL
+  normalization tests, and
+  `test_file_logging_session_repository.py`'s new legacy-data test (which
+  relies on `Qso` construction normalizing `call` during deserialization).
+- `qso_entry_form_widget.py`'s live-uppercase modification has no
+  dependency on anything new and must land before its new
+  `test_qso_entry_form_widget.py` test case.
+- These two implementation tasks are independent of each other and may be
+  done in either order.

@@ -133,6 +133,29 @@ on demand.
       THEN THE SYSTEM SHALL reject the QSO at submission time (see Story
       1/2) rather than produce a record with an undefined BAND.
 
+### Story 5: CALL is always uppercase
+
+> As an **operator**, I want **the CALL field to always show and store
+> capital letters**, so that **my log matches standard callsign
+> formatting regardless of my keyboard's Caps Lock or layout state, and
+> doesn't need manual correction before uploading**.
+
+**Acceptance criteria:**
+
+- [ ] WHEN the operator types into the CALL field, THE SYSTEM SHALL
+      display any letters as uppercase, regardless of the physical
+      keyboard's case/layout state (e.g. Caps Lock off, a non-US layout).
+- [ ] THE SYSTEM SHALL leave non-letter characters in CALL (digits, "/",
+      etc.) unchanged.
+- [ ] WHEN a QSO is submitted, THE SYSTEM SHALL store CALL with any
+      letters as uppercase.
+- [ ] WHEN the operator triggers "Generate ADIF" (Story 4), THE SYSTEM
+      SHALL write CALL in the ADIF file with any letters as uppercase,
+      for every QSO in the file regardless of when it was submitted.
+- [ ] THE SYSTEM SHALL NOT otherwise change the behavior described in
+      Story 1's "no format or callsign-lookup validation" criterion — this
+      story only affects letter case, not what characters are accepted.
+
 ## Out of scope
 
 - Editing or deleting a QSO after it has been submitted and added to the
@@ -149,8 +172,16 @@ on demand.
 
 ## Open questions
 
-None currently outstanding. All four questions raised during drafting have
-been resolved and folded into the stories above:
+- [ ] Story 5 was added after `design.md` and `tasks.md` for this feature
+      were already approved and implemented (CALL is currently stored and
+      exported exactly as typed). Implementing Story 5 needs a follow-up
+      pass through `/spec-design qso-entering` (to decide where the
+      uppercase normalization lives — e.g. the entry widget, the domain
+      `Qso`/`LoggingSession`, and/or the ADIF exporter) and
+      `/spec-tasks qso-entering` before `/implement-task` can add it,
+      rather than editing already-shipped code ad hoc.
+
+Resolved from earlier drafting, still valid:
 
 - Platform: desktop GUI, built with PyQt (tracked as a decision in
   `.claude/rules/tech.md`).
@@ -158,4 +189,5 @@ been resolved and folded into the stories above:
   resume/start-clean prompt on startup (Story 3).
 - BAND derivation: fixed frequency-range table (Story 4).
 - FREQ format / CALL validation: FREQ is a decimal-MHz string; CALL has no
-  validation (Story 1).
+  format/lookup validation, but Story 5 now governs its letter case
+  (Story 1).
