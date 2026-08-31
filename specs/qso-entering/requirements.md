@@ -283,14 +283,24 @@ between entries, and triggering that ADIF export on demand.
 
 **Acceptance criteria:**
 
-- [ ] THE SYSTEM SHALL display the 11 entry fields top-to-bottom in this
-      order: CALL, RST_RCVD, RST_SENT, TIME_ON, FREQ, MY_SIG_INFO,
-      QSO_DATE, MODE, OPERATOR, MY_RIG, TX_PWR.
-- [ ] THE SYSTEM SHALL set the keyboard Tab order to visit the 11 fields in
-      that same order.
+- [ ] THE SYSTEM SHALL display the 11 entry fields grouped into 3 columns,
+      each column's fields top-to-bottom in this order:
+
+  | Column 1 | Column 2 | Column 3 |
+  |----------|----------|----------|
+  | CALL | FREQ | OPERATOR |
+  | RST_RCVD | MY_SIG_INFO | MY_RIG |
+  | RST_SENT | QSO_DATE | TX_PWR |
+  | TIME_ON | MODE | |
+
+- [ ] THE SYSTEM SHALL set the keyboard Tab order to visit the 11 fields
+      column-major — top-to-bottom through column 1, then column 2, then
+      column 3 — which is the same field-to-field sequence as before this
+      story's column grouping: CALL, RST_RCVD, RST_SENT, TIME_ON, FREQ,
+      MY_SIG_INFO, QSO_DATE, MODE, OPERATOR, MY_RIG, TX_PWR.
 - [ ] THE SYSTEM SHALL NOT otherwise change any field's behavior (default
       value, carry-forward, uppercase normalization, validation) — this
-      story only reorders where fields appear and how Tab moves between
+      story only changes where fields appear and how Tab moves between
       them.
 
 ## Out of scope

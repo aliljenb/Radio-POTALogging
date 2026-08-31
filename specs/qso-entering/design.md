@@ -195,6 +195,48 @@ walk its rows and assert the display order directly — the same
 "reach into a private attribute" pattern the existing tests already use
 for `widget._call`, `widget._mode`, etc.
 
+**Amendment (Story 12 column layout, added after Story 12 was
+implemented)**: the single top-to-bottom `QFormLayout` (`self._form`)
+becomes three side-by-side `QFormLayout`s, grouping the same 11 fields
+into columns instead of one long list:
+
+| Column 1 | Column 2 | Column 3 |
+|----------|----------|----------|
+| CALL | FREQ | OPERATOR |
+| RST_RCVD | MY_SIG_INFO | MY_RIG |
+| RST_SENT | QSO_DATE | TX_PWR |
+| TIME_ON | MODE | |
+
+Three changes to `QsoEntryFormWidget.__init__`, all confined to layout
+construction:
+
+1. `self._form` is replaced by `self._column_1`, `self._column_2`,
+   `self._column_3` — three `QFormLayout` instances — each populated with
+   its own `addRow(label, widget)` calls in the table order above, using
+   the same field widgets already constructed (no change to widget
+   construction itself, only to which layout each `addRow(...)` call
+   targets).
+2. A new `QHBoxLayout` holds the three column layouts side by side
+   (`addLayout(self._column_1)`, etc.); the outer `QVBoxLayout`'s
+   `layout.addLayout(self._form)` call is replaced with
+   `layout.addLayout(columns_layout)`.
+3. **No change** to the `self._fields` list, the `installEventFilter`
+   loop, or the `QWidget.setTabOrder(...)` chain from the original Story
+   12 amendment above. This is the point of that amendment having made
+   Tab order an explicit, code-stated chain rather than relying on Qt's
+   default (layout-insertion-order-derived) Tab order: the chain is a
+   flat list independent of which layout each widget visually lives in,
+   so column grouping is a pure visual change that requires zero Tab-order
+   code changes. The column groupings above were chosen so that reading
+   column 1 top-to-bottom, then column 2, then column 3, reproduces
+   exactly the existing 11-field order (`CALL, RST_RCVD, RST_SENT,
+   TIME_ON, FREQ, MY_SIG_INFO, QSO_DATE, MODE, OPERATOR, MY_RIG, TX_PWR`)
+   — so the already-passing Tab-chain test (walking
+   `.nextInFocusChain()` from `widget._call`) needs no assertion changes,
+   only the row-order test described below.
+
+No domain/application change, same as the original Story 12 amendment.
+
 ## Domain Model
 
 > Pure business logic. Zero framework/infra imports. Lives under
@@ -375,7 +417,7 @@ satisfying "without discarding the previous session's persisted file."
 | `SessionSetupDialog` | Collect the park reference, date, start time, and starting frequency for a new session, or report that the operator chose to quit; disable "OK" while the park reference or frequency is empty; uppercase the park reference live as typed via `uppercase_as_typed()` (Story 7) (Story 6) | none (pure dialog; exposes `.setup_result: SessionSetupResult \| None` after `.exec()` — named to avoid shadowing `QDialog`'s own `.result()` method, the same reason `SessionResumePromptDialog` uses `.choice`) |
 | `session_bootstrap.bootstrap_session()` | Run the startup sequence (resume prompt if applicable, then either resume or the setup dialog + `StartNewSessionCommand`) and decide whether the app should proceed at all | `CheckForResumableSessionQuery`, `ResumeSessionCommand`, `StartNewSessionCommand`; shows `SessionResumePromptDialog`/`SessionSetupDialog` |
 | `uppercase_field.uppercase_as_typed(line_edit)` | Make one `QLineEdit` uppercase its text live as the operator types, preserving cursor position (Story 5/7) | none (pure Qt helper; called once per field during widget `__init__`) |
-| `QsoEntryFormWidget` | Render the 11 entry fields, in the order CALL, RST_RCVD, RST_SENT, TIME_ON, FREQ, MY_SIG_INFO, QSO_DATE, MODE, OPERATOR, MY_RIG, TX_PWR, and emit the submitted values (Story 12); apply a new `EntryDefaultsDto` to pre-fill itself and focus CALL; uppercase CALL, MY_SIG_INFO, and OPERATOR live as the operator types, via `uppercase_as_typed()` (requirements Story 5, 7, 8); render MODE as a non-editable `QComboBox` populated from `MODE_OPTIONS`, defaulting to "CW" (Story 9); submit on Enter/Return from any field when CALL is non-empty, via an `eventFilter` installed on all 11 fields (Story 11); Tab through the 11 fields in the same fixed order via an explicit `setTabOrder()` chain (Story 12) | emits `SubmitQsoRequest` via a Qt signal |
+| `QsoEntryFormWidget` | Render the 11 entry fields in 3 columns — column 1: CALL, RST_RCVD, RST_SENT, TIME_ON; column 2: FREQ, MY_SIG_INFO, QSO_DATE, MODE; column 3: OPERATOR, MY_RIG, TX_PWR (Story 12) — and emit the submitted values; apply a new `EntryDefaultsDto` to pre-fill itself and focus CALL; uppercase CALL, MY_SIG_INFO, and OPERATOR live as the operator types, via `uppercase_as_typed()` (requirements Story 5, 7, 8); render MODE as a non-editable `QComboBox` populated from `MODE_OPTIONS`, defaulting to "CW" (Story 9); submit on Enter/Return from any field when CALL is non-empty, via an `eventFilter` installed on all 11 fields (Story 11); Tab through the 11 fields column-major, in the same fixed order as their pre-column-layout sequence, via an explicit `setTabOrder()` chain (Story 12) | emits `SubmitQsoRequest` via a Qt signal |
 | `QsoListWidget` | Display submitted QSOs, in order, read-only | renders `QsoDto` rows appended to it |
 | `QsoEntryController` | Wire widget signals to application commands/queries and route results/errors back to the widgets | `SubmitQsoCommand`, `GenerateAdifCommand` |
 | `composition_root.py` (`main`) | Construct the concrete adapters, run `bootstrap_session()`, and — only if it returns a result rather than `None` — construct/show `MainWindow` and run the Qt event loop | — |
@@ -524,14 +566,18 @@ Mirrors `src/` under `tests/`.
   raising=False)` times out) and leaves the other fields' values
   unchanged; pressing Enter in CALL itself (now non-empty) also emits,
   matching the button-click test's existing assertions on the emitted
-  `SubmitQsoRequest`. Story 12: reading `widget._form`'s 11 rows' label
-  text, in order, equals `["CALL", "RST_RCVD", "RST_SENT", "TIME_ON",
-  "FREQ", "MY_SIG_INFO", "QSO_DATE", "MODE", "OPERATOR", "MY_RIG",
-  "TX_PWR"]`; separately, walking the Tab chain from `widget._call` via
-  repeated `.nextInFocusChain()` calls visits the 11 field widgets
-  (`widget._call, widget._rst_rcvd, ...`) in that same order — a
-  black-box check of the `setTabOrder()` chain's actual effect, not just
-  that the calls were made.
+  `SubmitQsoRequest`. Story 12: reading `widget._column_1`,
+  `widget._column_2`, and `widget._column_3`'s row label texts, in order,
+  equal `["CALL", "RST_RCVD", "RST_SENT", "TIME_ON"]`, `["FREQ",
+  "MY_SIG_INFO", "QSO_DATE", "MODE"]`, and `["OPERATOR", "MY_RIG",
+  "TX_PWR"]` respectively (updated from the original Story 12 amendment's
+  single-`widget._form` assertion, now that the fields live in three
+  layouts); separately, walking the Tab chain from `widget._call` via
+  repeated `.nextInFocusChain()` calls still visits the 11 field widgets
+  (`widget._call, widget._rst_rcvd, ...`) in that same original order — a
+  black-box check that the `setTabOrder()` chain's actual effect is
+  unaffected by the column-layout amendment, not just that the calls were
+  made.
 
 ## Open Questions / Risks
 

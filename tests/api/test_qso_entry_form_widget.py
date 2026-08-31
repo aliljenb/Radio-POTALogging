@@ -182,28 +182,20 @@ def test_enter_in_call_does_nothing_when_call_is_empty(qtbot: QtBot) -> None:
     assert not blocker.signal_triggered
 
 
-def test_fields_are_displayed_in_the_fixed_order(qtbot: QtBot) -> None:
+def _row_labels(column: QFormLayout, row_count: int) -> list[str]:
+    return [
+        column.itemAt(i, QFormLayout.ItemRole.LabelRole).widget().text()  # type: ignore[union-attr]
+        for i in range(row_count)
+    ]
+
+
+def test_fields_are_displayed_in_the_fixed_column_order(qtbot: QtBot) -> None:
     widget = QsoEntryFormWidget()
     qtbot.addWidget(widget)
 
-    labels = [
-        widget._form.itemAt(i, QFormLayout.ItemRole.LabelRole).widget().text()  # type: ignore[union-attr]
-        for i in range(11)
-    ]
-
-    assert labels == [
-        "CALL",
-        "RST_RCVD",
-        "RST_SENT",
-        "TIME_ON",
-        "FREQ",
-        "MY_SIG_INFO",
-        "QSO_DATE",
-        "MODE",
-        "OPERATOR",
-        "MY_RIG",
-        "TX_PWR",
-    ]
+    assert _row_labels(widget._column_1, 4) == ["CALL", "RST_RCVD", "RST_SENT", "TIME_ON"]
+    assert _row_labels(widget._column_2, 4) == ["FREQ", "MY_SIG_INFO", "QSO_DATE", "MODE"]
+    assert _row_labels(widget._column_3, 3) == ["OPERATOR", "MY_RIG", "TX_PWR"]
 
 
 def test_tab_order_follows_the_fixed_field_order(qtbot: QtBot) -> None:

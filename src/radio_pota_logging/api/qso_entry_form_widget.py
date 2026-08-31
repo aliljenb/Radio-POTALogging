@@ -11,6 +11,7 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QDateEdit,
     QFormLayout,
+    QHBoxLayout,
     QLabel,
     QLineEdit,
     QPushButton,
@@ -56,25 +57,34 @@ class QsoEntryFormWidget(QWidget):
         self._error_label.setStyleSheet("color: red;")
         self._error_label.hide()
 
-        self._form = QFormLayout()
-        self._form.addRow("CALL", self._call)
-        self._form.addRow("RST_RCVD", self._rst_rcvd)
-        self._form.addRow("RST_SENT", self._rst_sent)
-        self._form.addRow("TIME_ON", self._time_on)
-        self._form.addRow("FREQ", self._freq)
-        self._form.addRow("MY_SIG_INFO", self._my_sig_info)
-        self._form.addRow("QSO_DATE", self._qso_date)
-        self._form.addRow("MODE", self._mode)
-        self._form.addRow("OPERATOR", self._operator)
-        self._form.addRow("MY_RIG", self._my_rig)
-        self._form.addRow("TX_PWR", self._tx_pwr)
+        self._column_1 = QFormLayout()
+        self._column_1.addRow("CALL", self._call)
+        self._column_1.addRow("RST_RCVD", self._rst_rcvd)
+        self._column_1.addRow("RST_SENT", self._rst_sent)
+        self._column_1.addRow("TIME_ON", self._time_on)
+
+        self._column_2 = QFormLayout()
+        self._column_2.addRow("FREQ", self._freq)
+        self._column_2.addRow("MY_SIG_INFO", self._my_sig_info)
+        self._column_2.addRow("QSO_DATE", self._qso_date)
+        self._column_2.addRow("MODE", self._mode)
+
+        self._column_3 = QFormLayout()
+        self._column_3.addRow("OPERATOR", self._operator)
+        self._column_3.addRow("MY_RIG", self._my_rig)
+        self._column_3.addRow("TX_PWR", self._tx_pwr)
+
+        columns_layout = QHBoxLayout()
+        columns_layout.addLayout(self._column_1)
+        columns_layout.addLayout(self._column_2)
+        columns_layout.addLayout(self._column_3)
 
         submit_button = QPushButton("Submit")
         submit_button.clicked.connect(self._on_submit_clicked)
 
         layout = QVBoxLayout()
         layout.addWidget(self._error_label)
-        layout.addLayout(self._form)
+        layout.addLayout(columns_layout)
         layout.addWidget(submit_button)
         self.setLayout(layout)
 
