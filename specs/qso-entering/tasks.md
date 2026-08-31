@@ -311,6 +311,20 @@ Frontend Design section; this project has no `frontend/src`)
       `setTabOrder(self._rst_rcvd, self._rst_sent)`, … through
       `self._tx_pwr`) per design.md § Overview (Story 12 amendment) and §
       Components.
+- [x] `qso_entry_form_widget.py` — **modify** `QsoEntryFormWidget.__init__`:
+      replace the single `self._form` `QFormLayout` with three
+      `QFormLayout` instances — `self._column_1` (CALL, RST_RCVD,
+      RST_SENT, TIME_ON), `self._column_2` (FREQ, MY_SIG_INFO, QSO_DATE,
+      MODE), `self._column_3` (OPERATOR, MY_RIG, TX_PWR) — each populated
+      via its own `addRow(label, widget)` calls in that order, using the
+      already-constructed field widgets (no change to widget construction
+      itself); wrap the three in a new `QHBoxLayout` and replace
+      `layout.addLayout(self._form)` with
+      `layout.addLayout(columns_layout)` in the outer `QVBoxLayout`. Do
+      **not** change `self._fields`, the `installEventFilter` loop, or the
+      `QWidget.setTabOrder(...)` chain — per design.md § Overview (Story 12
+      column layout amendment) and § Components, those stay exactly as
+      Story 12's original amendment left them.
 - [x] `composition_root.py` — **modify** `main()`: after constructing
       `QApplication`, call
       `session_bootstrap.bootstrap_session(check_for_resumable_session=CheckForResumableSessionQuery(repository),
@@ -556,6 +570,17 @@ N/A — this project has no `frontend/src`; see design.md § API Layer.
       "RST_RCVD", "RST_SENT", "TIME_ON", "FREQ", "MY_SIG_INFO",
       "QSO_DATE", "MODE", "OPERATOR", "MY_RIG", "TX_PWR"]` per design.md §
       Testing Strategy.
+- [x] `tests/api/test_qso_entry_form_widget.py` — **modify** (Story 12
+      column layout): replace the single-`widget._form` row-order test
+      above with three assertions, one per column, using the same
+      `QFormLayout.itemAt(i, QFormLayout.ItemRole.LabelRole).widget().text()`
+      row-reading approach against `widget._column_1`, `widget._column_2`,
+      `widget._column_3`: `["CALL", "RST_RCVD", "RST_SENT", "TIME_ON"]`,
+      `["FREQ", "MY_SIG_INFO", "QSO_DATE", "MODE"]`, and `["OPERATOR",
+      "MY_RIG", "TX_PWR"]` respectively, per design.md § Testing Strategy
+      (Story 12 column layout amendment). Leave the Tab-chain
+      `.nextInFocusChain()` test below unmodified — design.md states it
+      needs no changes.
 - [x] `tests/api/test_qso_entry_form_widget.py` — **add** a pytest-qt test
       (Story 12): starting from `widget._call`, call
       `.nextInFocusChain()` repeatedly and assert the resulting sequence
@@ -742,3 +767,14 @@ N/A — this project has no `frontend/src`; see design.md § API Layer.
   `test_qso_entry_form_widget.py` test cases.
 - Independent of the Story 2 RST reset and Story 10 height-fraction
   amendments — may be done in any order relative to them.
+
+### Story 12 column layout amendment (added after Story 12 was implemented)
+
+- `qso_entry_form_widget.py`'s column-layout modification depends on
+  Story 12's original field-reorder/`setTabOrder()` task already being
+  landed (it replaces that task's `self._form`/`layout.addLayout(self._form)`
+  lines, and relies on `self._fields` and the `setTabOrder()` chain
+  staying untouched) and must land before its own modified
+  `test_qso_entry_form_widget.py` row-order test.
+- Independent of every other amendment in this file — touches only
+  `qso_entry_form_widget.py`'s layout-construction lines.
