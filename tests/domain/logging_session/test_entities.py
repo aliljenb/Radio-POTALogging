@@ -6,7 +6,11 @@ from radio_pota_logging.domain.logging_session.exceptions import (
     FrequencyFormatError,
     FrequencyOutOfBandError,
 )
-from radio_pota_logging.domain.logging_session.value_objects import QsoTimestamp, StationDefaults
+from radio_pota_logging.domain.logging_session.value_objects import (
+    QsoTimestamp,
+    SessionStart,
+    StationDefaults,
+)
 
 
 def _new_session() -> LoggingSession:
@@ -178,6 +182,37 @@ def test_record_qso_rejects_unparsable_frequency_and_leaves_state_unchanged() ->
             tx_pwr="5",
         )
     assert session.qsos == ()
+
+
+def test_start_sets_session_start_from_qso_date_and_my_sig_info() -> None:
+    session = LoggingSession.start(
+        StationDefaults(), QsoTimestamp(date(2026, 8, 30), time(9, 0)), my_sig_info="k-1234"
+    )
+    assert session.session_start == SessionStart(qso_date=date(2026, 8, 30), my_sig_info="K-1234")
+
+
+def test_record_qso_leaves_session_start_unchanged() -> None:
+    session = _new_session()
+    original_session_start = session.session_start
+    session.record_qso(
+        call="W1AW",
+        qso_date=date(2026, 8, 30),
+        time_on=time(23, 59),
+        mode="CW",
+        my_sig_info="K-1234",
+        rst_sent="599",
+        rst_rcvd="599",
+        freq="14.062",
+        operator="SM6Y",
+        my_rig="Elecraft KX2",
+        tx_pwr="5",
+    )
+
+    # TIME_ON + 2 minutes rolls next_entry_defaults' QSO_DATE to the next
+    # day; session_start must not follow that rollover.
+    assert session.next_entry_defaults.timestamp.qso_date == date(2026, 8, 31)
+    assert session.session_start == original_session_start
+    assert session.session_start.qso_date == date(2026, 8, 30)
 
 
 def test_record_qso_rejects_out_of_band_frequency_and_leaves_state_unchanged() -> None:

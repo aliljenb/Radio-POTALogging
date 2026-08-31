@@ -12,6 +12,7 @@ from radio_pota_logging.domain.logging_session.value_objects import (
     Frequency,
     Qso,
     QsoTimestamp,
+    SessionStart,
     StationDefaults,
 )
 
@@ -127,6 +128,11 @@ def test_entry_defaults_seed_normalizes_operator_to_uppercase() -> None:
 
 def test_mode_options_is_cw_and_ssb() -> None:
     assert MODE_OPTIONS == ("CW", "SSB")
+
+
+def test_session_start_normalizes_my_sig_info_to_uppercase() -> None:
+    session_start = SessionStart(qso_date=date(2026, 8, 30), my_sig_info="k-1234")
+    assert session_start.my_sig_info == "K-1234"
 
 
 @pytest.mark.parametrize(

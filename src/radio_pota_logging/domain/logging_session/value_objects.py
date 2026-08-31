@@ -87,6 +87,18 @@ class QsoTimestamp:
 
 
 @dataclass(frozen=True)
+class SessionStart:
+    """The QSO_DATE and park reference a session began with — fixed for its
+    whole lifetime, unlike EntryDefaults, which mutates after every submitted QSO."""
+
+    qso_date: date
+    my_sig_info: str
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "my_sig_info", self.my_sig_info.upper())
+
+
+@dataclass(frozen=True)
 class StationDefaults:
     """Fixed application-level constants used to seed a brand-new session."""
 

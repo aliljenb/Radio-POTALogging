@@ -12,5 +12,7 @@
 	<string>launch</string>
 	<key>CFBundleShortVersionString</key>
 	<string>1.0</string>
+	<key>LSRequiresNativeExecution</key>
+	<true/>
 </dict>
 </plist>

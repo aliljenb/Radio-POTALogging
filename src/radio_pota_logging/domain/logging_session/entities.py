@@ -5,7 +5,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, time
 
-from .value_objects import EntryDefaults, Frequency, Qso, QsoTimestamp, SessionId, StationDefaults
+from .value_objects import (
+    EntryDefaults,
+    Frequency,
+    Qso,
+    QsoTimestamp,
+    SessionId,
+    SessionStart,
+    StationDefaults,
+)
 
 
 @dataclass(eq=False)
@@ -19,6 +27,7 @@ class LoggingSession:
     session_id: SessionId
     qsos: tuple[Qso, ...]
     next_entry_defaults: EntryDefaults
+    session_start: SessionStart
 
     def __eq__(self, other: object) -> bool:
         return isinstance(other, LoggingSession) and self.session_id == other.session_id
@@ -40,6 +49,7 @@ class LoggingSession:
             next_entry_defaults=EntryDefaults.seed(
                 station_defaults, now, my_sig_info=my_sig_info, freq=freq
             ),
+            session_start=SessionStart(qso_date=now.qso_date, my_sig_info=my_sig_info),
         )
 
     def record_qso(

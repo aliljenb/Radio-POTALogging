@@ -1,5 +1,6 @@
 #!/bin/sh
-PROJECT_DIR="${POTA_LAUNCHER_PROJECT_DIR:-/Volumes/iMac-Extended-01/Projects_EXT/Python/Radio-POTALogging}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
 PYTHON="$PROJECT_DIR/.venv/bin/python"
 LOGS_DIR="$HOME/POTA Logs"
 LOG_FILE="$LOGS_DIR/launcher.log"
@@ -12,7 +13,13 @@ fi
 mkdir -p "$LOGS_DIR"
 cd "$LOGS_DIR" || exit 1
 
-"$PYTHON" -m radio_pota_logging.api.composition_root > "$LOG_FILE" 2>&1
+if [ "$(sysctl -n hw.optional.arm64 2>/dev/null)" = "1" ]; then
+    NATIVE_ARCH="arm64"
+else
+    NATIVE_ARCH="x86_64"
+fi
+
+arch -"$NATIVE_ARCH" "$PYTHON" -m radio_pota_logging.api.composition_root > "$LOG_FILE" 2>&1
 exit_code=$?
 
 if [ "$exit_code" -ne 0 ]; then

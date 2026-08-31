@@ -11,6 +11,7 @@ from radio_pota_logging.application.logging_session.commands import (
     SubmitQsoCommand,
 )
 from radio_pota_logging.application.logging_session.dto import SubmitQsoRequest
+from radio_pota_logging.application.logging_session.queries import SuggestAdifFilenameQuery
 from radio_pota_logging.domain.logging_session.exceptions import (
     FrequencyFormatError,
     FrequencyOutOfBandError,
@@ -29,12 +30,14 @@ class QsoEntryController:
         qso_list: QsoListWidget,
         submit_command: SubmitQsoCommand,
         generate_adif_command: GenerateAdifCommand,
+        suggest_adif_filename_command: SuggestAdifFilenameQuery,
         dialog_parent: QWidget,
     ) -> None:
         self._form = form
         self._qso_list = qso_list
         self._submit_command = submit_command
         self._generate_adif_command = generate_adif_command
+        self._suggest_adif_filename_command = suggest_adif_filename_command
         self._dialog_parent = dialog_parent
         form.submitted.connect(self._on_submit)
 
@@ -49,8 +52,9 @@ class QsoEntryController:
         self._form.apply_defaults(result.entry_defaults)
 
     def generate_adif(self) -> None:
+        suggested_filename = self._suggest_adif_filename_command.execute()
         destination_text, _ = QFileDialog.getSaveFileName(
-            self._dialog_parent, "Generate ADIF", "", "ADIF files (*.adi)"
+            self._dialog_parent, "Generate ADIF", suggested_filename, "ADIF files (*.adi)"
         )
         if not destination_text:
             return
