@@ -10,11 +10,11 @@
 
 After a portable "Parks On The Air" (POTA) activation, an operator needs to
 transcribe contacts (QSOs) from a paper log into digital form, quickly and
-with minimal repeated typing, and produce a standard ADIF log file that can
-be uploaded to POTA/ARRL/LoTW and similar services. This feature is a
-desktop application form for entering QSOs one at a time, carrying forward
-repetitive field values between entries, and generating an ADIF export
-on demand.
+with minimal repeated typing, ahead of producing a standard ADIF log file
+that can be uploaded to POTA/ARRL/LoTW and similar services (see the
+adif-generation feature). This feature is a desktop application form for
+entering QSOs one at a time, carrying forward repetitive field values
+between entries, and triggering that ADIF export on demand.
 
 ## User stories
 
@@ -62,7 +62,8 @@ on demand.
 - [ ] WHEN the operator submits a QSO, THE SYSTEM SHALL set TIME_OFF equal
       to TIME_ON for that QSO.
 - [ ] WHEN the operator submits a QSO, THE SYSTEM SHALL store all fields
-      required for the log file (see Story 4) for that QSO.
+      required for the log file (see the adif-generation feature's Story 1)
+      for that QSO.
 - [ ] WHEN a QSO is submitted, THE SYSTEM SHALL append it to the end of a
       visible QSO list, displayed above the entry form for the next QSO.
 - [ ] WHEN the next entry form is displayed, THE SYSTEM SHALL pre-fill
@@ -105,42 +106,6 @@ on demand.
       list with the first-entry defaults of Story 1, without discarding
       the previous session's persisted file.
 
-### Story 4: Generate an ADIF log file on demand
-
-> As an **operator**, I want to **generate an ADIF file from all QSOs I've
-> entered at any point**, so that **I can upload my log without waiting
-> until every contact from the trip is transcribed**.
-
-**Acceptance criteria:**
-
-- [ ] THE SYSTEM SHALL provide a "Generate ADIF" action that is available
-      at any time, independent of whether a QSO entry is in progress.
-- [ ] WHEN the operator triggers "Generate ADIF", THE SYSTEM SHALL produce
-      an ADIF-format file containing one record per submitted QSO.
-- [ ] THE SYSTEM SHALL include only these fields per record: OPERATOR,
-      CALL, QSO_DATE, TIME_ON, TIME_OFF, BAND, MODE, MY_SIG, MY_SIG_INFO,
-      RST_SENT, RST_RCVD, FREQ, MY_RIG, TX_PWR.
-- [ ] THE SYSTEM SHALL derive BAND for each record from that QSO's FREQ
-      (MHz) using the following table; BAND is never entered directly by
-      the operator:
-
-  | FREQ range (MHz)  | BAND |
-  |--------------------|------|
-  | 1.800 – 2.000      | 160M |
-  | 3.500 – 4.000      | 80M  |
-  | 7.000 – 7.300      | 40M  |
-  | 10.100 – 10.150    | 30M  |
-  | 14.000 – 14.350    | 20M  |
-  | 18.068 – 18.168    | 17M  |
-  | 21.000 – 21.450    | 15M  |
-  | 24.890 – 24.990    | 12M  |
-  | 28.000 – 29.700    | 10M  |
-  | 50.000 – 54.000    | 6M   |
-
-- [ ] IF a QSO's FREQ does not fall within any range in the table above,
-      THEN THE SYSTEM SHALL reject the QSO at submission time (see Story
-      1/2) rather than produce a record with an undefined BAND.
-
 ### Story 5: CALL is always uppercase
 
 > As an **operator**, I want **the CALL field to always show and store
@@ -157,7 +122,7 @@ on demand.
       etc.) unchanged.
 - [ ] WHEN a QSO is submitted, THE SYSTEM SHALL store CALL with any
       letters as uppercase.
-- [ ] WHEN the operator triggers "Generate ADIF" (Story 4), THE SYSTEM
+- [ ] WHEN the operator triggers "Generate ADIF" (adif-generation Story 1), THE SYSTEM
       SHALL write CALL in the ADIF file with any letters as uppercase,
       for every QSO in the file regardless of when it was submitted.
 - [ ] THE SYSTEM SHALL NOT otherwise change the behavior described in
@@ -222,7 +187,7 @@ on demand.
       "-", etc.) unchanged.
 - [ ] WHEN a QSO is submitted, THE SYSTEM SHALL store MY_SIG_INFO with any
       letters as uppercase.
-- [ ] WHEN the operator triggers "Generate ADIF" (Story 4), THE SYSTEM
+- [ ] WHEN the operator triggers "Generate ADIF" (adif-generation Story 1), THE SYSTEM
       SHALL write MY_SIG_INFO in the ADIF file with any letters as
       uppercase, for every QSO in the file regardless of when it was
       submitted.
@@ -245,7 +210,7 @@ on demand.
 - [ ] THE SYSTEM SHALL leave non-letter characters in OPERATOR unchanged.
 - [ ] WHEN a QSO is submitted, THE SYSTEM SHALL store OPERATOR with any
       letters as uppercase.
-- [ ] WHEN the operator triggers "Generate ADIF" (Story 4), THE SYSTEM
+- [ ] WHEN the operator triggers "Generate ADIF" (adif-generation Story 1), THE SYSTEM
       SHALL write OPERATOR in the ADIF file with any letters as
       uppercase, for every QSO in the file regardless of when it was
       submitted.
@@ -415,7 +380,7 @@ Resolved from earlier drafting, still valid:
   `.claude/rules/tech.md`).
 - Persistence: file-based, in the application's launch directory, with a
   resume/start-clean prompt on startup (Story 3).
-- BAND derivation: fixed frequency-range table (Story 4).
+- BAND derivation: fixed frequency-range table (adif-generation Story 1).
 - FREQ format / CALL validation: FREQ is a decimal-MHz string; CALL has no
   format/lookup validation, but Story 5 now governs its letter case
   (Story 1).

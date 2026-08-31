@@ -25,8 +25,9 @@ single, independently completable unit of work with a clear file target.
       `160M`…`6M`) per design.md § Value Objects
 - [x] `value_objects.py` — implement `Frequency` (parses a decimal-MHz
       string, raises `FrequencyFormatError`; `.band` property derives
-      `Band` via the requirements Story 4 band-plan table, raising
-      `FrequencyOutOfBandError` on no match) per design.md § Value Objects
+      `Band` via the adif-generation feature's requirements Story 1
+      band-plan table, raising `FrequencyOutOfBandError` on no match) per
+      design.md § Value Objects
 - [x] `value_objects.py` — implement `QsoTimestamp` (`qso_date`, `time_on`;
       `.plus_two_minutes()` using `datetime` arithmetic for midnight
       rollover) per design.md § Value Objects
@@ -167,8 +168,9 @@ single, independently completable unit of work with a clear file target.
       Persistence and § Repository Implementations (adapters)
 - [x] `adif/adif_file_exporter.py` — implement `AdifFileExporter`
       (implements `AdifExporter`): formats one ADIF record per `Qso` using
-      exactly the 14 fields from requirements Story 4, as a pure string
-      transform per design.md § Repository Implementations (adapters)
+      exactly the 14 fields from the adif-generation feature's requirements
+      Story 1, as a pure string transform per design.md § Repository
+      Implementations (adapters)
 
 ## API Layer
 
