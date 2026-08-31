@@ -55,3 +55,25 @@ def test_export_empty_session_has_header_but_no_records() -> None:
     text = AdifFileExporter().export(())
     assert "<EOH>" in text
     assert "<EOR>" not in text
+
+
+def test_export_writes_zero_seconds_for_a_qso_built_from_nonzero_seconds_input() -> None:
+    session = LoggingSession.start(StationDefaults(), QsoTimestamp(date(2026, 8, 30), time(9, 0)))
+    session.record_qso(
+        call="W1AW",
+        qso_date=date(2026, 8, 30),
+        time_on=time(14, 12, 47),
+        mode="CW",
+        my_sig_info="K-1234",
+        rst_sent="599",
+        rst_rcvd="599",
+        freq="14.062",
+        operator="SM6Y",
+        my_rig="Elecraft KX2",
+        tx_pwr="5",
+    )
+
+    text = AdifFileExporter().export(session.qsos)
+
+    assert "<TIME_ON:6>141200" in text
+    assert "<TIME_OFF:6>141200" in text

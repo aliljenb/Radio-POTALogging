@@ -74,6 +74,13 @@ def test_dialog_prefills_date_and_time_from_now(qtbot: QtBot) -> None:
     assert dialog._time_on.time().toPyTime() == time(14, 30, 0)
 
 
+def test_time_on_display_format_hides_seconds(qtbot: QtBot) -> None:
+    dialog = SessionSetupDialog()
+    qtbot.addWidget(dialog)
+
+    assert dialog._time_on.displayFormat() == "HH:mm"
+
+
 def test_clicking_quit_leaves_result_none(qtbot: QtBot) -> None:
     dialog = SessionSetupDialog()
     qtbot.addWidget(dialog)

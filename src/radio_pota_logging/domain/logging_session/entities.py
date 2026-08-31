@@ -13,6 +13,7 @@ from .value_objects import (
     SessionId,
     SessionStart,
     StationDefaults,
+    default_rst_for_mode,
 )
 
 
@@ -92,8 +93,8 @@ class LoggingSession:
             operator=operator,
             mode=mode,
             my_sig_info=my_sig_info,
-            rst_sent=StationDefaults.rst_sent,
-            rst_rcvd=StationDefaults.rst_rcvd,
+            rst_sent=default_rst_for_mode(mode),
+            rst_rcvd=default_rst_for_mode(mode),
             freq=str(frequency.megahertz),
             my_rig=my_rig,
             tx_pwr=tx_pwr,

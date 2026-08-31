@@ -6,7 +6,10 @@ from dataclasses import dataclass
 from datetime import date, time
 from pathlib import Path
 
-from radio_pota_logging.domain.logging_session.value_objects import MODE_OPTIONS
+from radio_pota_logging.domain.logging_session.value_objects import (
+    MODE_OPTIONS,
+    default_rst_for_mode,
+)
 
 __all__ = [
     "MODE_OPTIONS",
@@ -16,6 +19,7 @@ __all__ = [
     "SessionStartResult",
     "SubmitQsoRequest",
     "SubmitQsoResult",
+    "default_rst_for_mode",
 ]
 
 

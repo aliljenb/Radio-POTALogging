@@ -81,6 +81,9 @@ class QsoTimestamp:
     qso_date: date
     time_on: time
 
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "time_on", self.time_on.replace(second=0, microsecond=0))
+
     def plus_two_minutes(self) -> QsoTimestamp:
         combined = datetime.combine(self.qso_date, self.time_on) + timedelta(minutes=2)
         return QsoTimestamp(combined.date(), combined.time())
@@ -105,14 +108,20 @@ class StationDefaults:
     operator: str = "SM6Y"
     mode: str = "CW"
     my_sig: str = "POTA"
-    rst_sent: str = "599"
-    rst_rcvd: str = "599"
     my_rig: str = "Elecraft KX2"
     tx_pwr: str = "5"
 
 
 # The only two supported MODE values (requirements.md Story 9).
 MODE_OPTIONS: tuple[str, str] = ("CW", "SSB")
+
+# The RST report each MODE defaults to (requirements.md Story 13).
+_RST_DEFAULTS_BY_MODE: dict[str, str] = {"CW": "599", "SSB": "59"}
+
+
+def default_rst_for_mode(mode: str) -> str:
+    """The default RST_SENT/RST_RCVD value for a given MODE ("CW" or "SSB")."""
+    return _RST_DEFAULTS_BY_MODE[mode]
 
 
 @dataclass(frozen=True)
@@ -145,8 +154,8 @@ class EntryDefaults:
             operator=station_defaults.operator,
             mode=station_defaults.mode,
             my_sig_info=my_sig_info,
-            rst_sent=station_defaults.rst_sent,
-            rst_rcvd=station_defaults.rst_rcvd,
+            rst_sent=default_rst_for_mode(station_defaults.mode),
+            rst_rcvd=default_rst_for_mode(station_defaults.mode),
             freq=freq,
             my_rig=station_defaults.my_rig,
             tx_pwr=station_defaults.tx_pwr,

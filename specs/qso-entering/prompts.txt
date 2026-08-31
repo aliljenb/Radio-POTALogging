@@ -65,3 +65,7 @@ The main dialog's entry fields shall have the following display and TAB order:
 10. MY_RIG
 11. TX_PWR
 ------------------------------
+TIME_ON and TIME_OFF shall always have seconds=00, e.g. <TIME_ON:6>141200.
+If the operator select MODE=CW then RST_SENT and RST_RCVD default value shall be "599".
+If the operator select MODE=SSB then RST_SENT and RST_RCVD default value shall be "59".
+------------------------------

@@ -165,6 +165,25 @@ def test_record_qso_resets_rst_sent_and_rst_rcvd_instead_of_carrying_them_forwar
     assert session.next_entry_defaults.rst_rcvd == "599"
 
 
+def test_record_qso_resets_rst_sent_and_rst_rcvd_to_the_submitted_qsos_mode_default() -> None:
+    session = _new_session()
+    session.record_qso(
+        call="W1AW",
+        qso_date=date(2026, 8, 30),
+        time_on=time(12, 0),
+        mode="SSB",
+        my_sig_info="K-1234",
+        rst_sent="599",
+        rst_rcvd="599",
+        freq="14.062",
+        operator="SM6Y",
+        my_rig="Elecraft KX2",
+        tx_pwr="5",
+    )
+    assert session.next_entry_defaults.rst_sent == "59"
+    assert session.next_entry_defaults.rst_rcvd == "59"
+
+
 def test_record_qso_rejects_unparsable_frequency_and_leaves_state_unchanged() -> None:
     session = _new_session()
     with pytest.raises(FrequencyFormatError):

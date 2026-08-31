@@ -6,6 +6,10 @@
 - [x] In Review
 - [x] Approved
 
+_Stories 13 and 14 approved 2026-08-31; Stories 1-12 remain previously
+approved and unchanged in substance except for the small cross-reference
+edits to Story 1, Story 2, and Story 9 noted above._
+
 ## Introduction
 
 After a portable "Parks On The Air" (POTA) activation, an operator needs to
@@ -31,9 +35,9 @@ between entries, and triggering that ADIF export on demand.
       TIME_ON, MODE, MY_SIG_INFO, RST_SENT, RST_RCVD, FREQ, OPERATOR,
       MY_RIG, and TX_PWR.
 - [ ] WHEN the form is first displayed, THE SYSTEM SHALL pre-fill OPERATOR
-      with "SM6Y", MODE with "CW", RST_SENT with "599", RST_RCVD with
-      "599", MY_RIG with "Elecraft KX2", and TX_PWR with "5", from
-      application constants.
+      with "SM6Y", MODE with "CW", RST_SENT and RST_RCVD with the
+      MODE-dependent default for "CW" (Story 13), MY_RIG with "Elecraft
+      KX2", and TX_PWR with "5", from application constants.
 - [ ] WHEN the form is first displayed for a new session, THE SYSTEM SHALL
       pre-fill QSO_DATE, TIME_ON, MY_SIG_INFO, and FREQ from the values
       the operator entered in the session-setup dialog (Story 6).
@@ -44,8 +48,9 @@ between entries, and triggering that ADIF export on demand.
 - [ ] IF the operator changes the value of a pre-filled field before
       submitting, THEN THE SYSTEM SHALL treat the edited value (not the
       original constant) as the value to carry forward per Story 2 — except
-      RST_SENT and RST_RCVD, which always reset to "599" on the next entry
-      regardless of any edit (Story 2).
+      RST_SENT and RST_RCVD, which always reset to the next entry's
+      MODE-dependent default on the next entry regardless of any edit
+      (Story 2, Story 13).
 - [ ] THE SYSTEM SHALL require FREQ to be entered in MHz as a decimal
       string (e.g. "14.062" or "14.0625").
 - [ ] THE SYSTEM SHALL NOT apply any format or callsign-lookup validation
@@ -77,10 +82,11 @@ between entries, and triggering that ADIF export on demand.
       SYSTEM SHALL roll TIME_ON over and advance QSO_DATE by one day for
       that pre-filled entry.
 - [ ] WHEN the next entry form is displayed, THE SYSTEM SHALL reset both
-      RST_SENT and RST_RCVD to "599", regardless of what was submitted (or
-      edited to) on the just-submitted QSO — unlike every other carried-
-      forward field, an edit to RST_SENT/RST_RCVD does not propagate to
-      the next entry.
+      RST_SENT and RST_RCVD to the MODE-dependent default for the next
+      entry's MODE (Story 13) — "599" if that MODE is "CW", "59" if that
+      MODE is "SSB" — regardless of what was submitted (or edited to) on
+      the just-submitted QSO — unlike every other carried-forward field,
+      an edit to RST_SENT/RST_RCVD does not propagate to the next entry.
 
 ### Story 3: Resume an interrupted logging session
 
@@ -235,6 +241,13 @@ between entries, and triggering that ADIF export on demand.
       SYSTEM SHALL carry the new selection forward to the next entry
       form's MODE default, the same way other pre-filled fields are
       already carried forward (Story 2).
+- [ ] WHEN the operator changes MODE on the current, not-yet-submitted
+      entry form, THE SYSTEM SHALL update RST_SENT and RST_RCVD to the new
+      MODE's default (Story 13) for each of RST_SENT/RST_RCVD that still
+      holds the previous MODE's default value — IF the operator has
+      already edited a field away from the previous MODE's default for
+      this entry, THEN THE SYSTEM SHALL leave that field's edited value
+      unchanged.
 
 ### Story 10: Main window opens at half width, three-quarters height
 
@@ -303,6 +316,57 @@ between entries, and triggering that ADIF export on demand.
       story only changes where fields appear and how Tab moves between
       them.
 
+### Story 13: RST_SENT/RST_RCVD default according to MODE
+
+> As an **operator**, I want **RST_SENT and RST_RCVD to default to the
+> standard signal report for my current mode**, so that **I don't have to
+> manually change the report value every time I switch between CW and SSB
+> contacts**.
+
+**Acceptance criteria:**
+
+- [ ] WHEN the entry form's MODE is "CW", THE SYSTEM SHALL default
+      RST_SENT and RST_RCVD to "599", for both the first entry of a
+      session (Story 1) and every subsequent entry (Story 2).
+- [ ] WHEN the entry form's MODE is "SSB", THE SYSTEM SHALL default
+      RST_SENT and RST_RCVD to "59", for both the first entry of a session
+      (Story 1) and every subsequent entry (Story 2).
+- [ ] THE SYSTEM SHALL continue to allow the operator to edit RST_SENT and
+      RST_RCVD to any value after the MODE-based default is applied, per
+      Story 1's "every pre-filled field can be edited" criterion.
+- [ ] THE SYSTEM SHALL apply the MODE-dependent default independently to
+      RST_SENT and RST_RCVD — an edit to one SHALL NOT affect whether the
+      other still follows the MODE default (Story 9's live-update
+      criterion).
+- [ ] THE SYSTEM SHALL NOT apply a MODE-dependent RST_SENT/RST_RCVD
+      default for any MODE other than "CW" or "SSB", since Story 9 already
+      restricts MODE to those two values.
+
+### Story 14: TIME_ON and TIME_OFF are always whole minutes
+
+> As an **operator**, I want **TIME_ON and TIME_OFF to always represent a
+> whole minute with no seconds component**, so that **my log matches how I
+> record contact times from a paper log (to the minute) and the generated
+> ADIF file doesn't imply a precision I never actually captured**.
+
+**Acceptance criteria:**
+
+- [ ] THE SYSTEM SHALL only allow the operator to enter TIME_ON to minute
+      precision (hours and minutes); no seconds component SHALL be
+      entered or displayed on the QSO entry form's TIME_ON field or the
+      session-setup dialog's "Time of first QSO" field (Story 6).
+- [ ] WHEN a QSO is submitted, THE SYSTEM SHALL store TIME_ON, and
+      therefore TIME_OFF (Story 2: TIME_OFF equals TIME_ON), with the
+      seconds component fixed at zero.
+- [ ] WHEN TIME_ON is advanced by 2 minutes for the next entry form,
+      including the midnight-rollover case (Story 2), THE SYSTEM SHALL
+      preserve zero seconds in the result.
+- [ ] WHEN the operator triggers "Generate ADIF" (adif-generation Story
+      1), THE SYSTEM SHALL write TIME_ON and TIME_OFF using ADIF's
+      6-digit HHMMSS time format with the seconds digits always "00" (for
+      example `<TIME_ON:6>141200`), for every QSO in the file regardless
+      of when it was submitted.
+
 ## Out of scope
 
 - Editing or deleting a QSO after it has been submitted and added to the
@@ -328,6 +392,12 @@ between entries, and triggering that ADIF export on demand.
   apply only at QSO submission time (Story 6).
 - Any MODE value other than "CW" or "SSB" (e.g. FM, RTTY, digital modes)
   — MODE only ever holds one of those two fixed values (Story 9).
+- Recording QSO time to sub-minute (seconds) precision, or letting the
+  operator enter or edit a seconds value — TIME_ON/TIME_OFF are always
+  whole minutes with seconds fixed at zero (Story 14).
+- Any RST_SENT/RST_RCVD default value other than "599" (CW) or "59"
+  (SSB) — no other mode or custom-default mapping is supported (Story
+  13).
 
 ## Open questions
 
@@ -343,6 +413,21 @@ between entries, and triggering that ADIF export on demand.
       already-implemented `MainWindow.__init__` resize call's height
       divisor, then `/spec-tasks qso-entering` before `/implement-task`
       can add it.
+- [ ] Story 13 needs a follow-up pass through `/spec-design qso-entering`
+      to decide how the MODE-dependent RST default replaces the current
+      fixed `StationDefaults.rst_sent`/`.rst_rcvd` ("599") constants used
+      by `EntryDefaults.seed` and `LoggingSession.record_qso`'s
+      `next_entry_defaults` (see the Story 2 RST reset design note), and
+      how `QsoEntryFormWidget` implements the live-update-on-MODE-change
+      behavior (Story 9) while still respecting a manual edit — then
+      `/spec-tasks qso-entering` before `/implement-task` can add it.
+- [ ] Story 14 needs a follow-up pass through `/spec-design qso-entering`
+      to decide where the "seconds always zero" invariant is enforced —
+      likely in `QsoTimestamp`/`Qso.__post_init__` (or the `QTimeEdit`
+      widget configuration, restricting entry to HH:MM) — and how the
+      ADIF 6-digit `HHMMSS` output format with `00` seconds is produced at
+      "Generate ADIF" time, then `/spec-tasks qso-entering` before
+      `/implement-task` can add it.
 - [ ] Story 12 needs a follow-up pass through `/spec-design qso-entering`
       to decide the Qt mechanism for the field order: reordering
       `QsoEntryFormWidget`'s `QFormLayout.addRow(...)` calls to match the

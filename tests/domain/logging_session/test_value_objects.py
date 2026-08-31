@@ -14,6 +14,7 @@ from radio_pota_logging.domain.logging_session.value_objects import (
     QsoTimestamp,
     SessionStart,
     StationDefaults,
+    default_rst_for_mode,
 )
 
 
@@ -88,6 +89,24 @@ def test_qso_timestamp_plus_two_minutes_rolls_over_midnight() -> None:
     assert timestamp.plus_two_minutes() == QsoTimestamp(date(2026, 8, 31), time(0, 1))
 
 
+@pytest.mark.parametrize(
+    ("time_on", "expected"),
+    [
+        (time(14, 12, 47), time(14, 12, 0)),
+        (time(14, 12, 0, 500_000), time(14, 12, 0)),
+        (time(0, 0, 0), time(0, 0, 0)),
+        (time(23, 59, 59, 999_999), time(23, 59, 0)),
+    ],
+)
+def test_qso_timestamp_normalizes_seconds_to_zero(time_on: time, expected: time) -> None:
+    assert QsoTimestamp(date(2026, 8, 30), time_on).time_on == expected
+
+
+def test_qso_timestamp_plus_two_minutes_normalizes_seconds_from_nonzero_input() -> None:
+    timestamp = QsoTimestamp(date(2026, 8, 30), time(23, 59, 30))
+    assert timestamp.plus_two_minutes() == QsoTimestamp(date(2026, 8, 31), time(0, 1))
+
+
 def test_entry_defaults_seed_leaves_my_sig_info_and_freq_empty() -> None:
     now = QsoTimestamp(date(2026, 8, 30), time(9, 0))
     defaults = EntryDefaults.seed(StationDefaults(), now)
@@ -128,6 +147,24 @@ def test_entry_defaults_seed_normalizes_operator_to_uppercase() -> None:
 
 def test_mode_options_is_cw_and_ssb() -> None:
     assert MODE_OPTIONS == ("CW", "SSB")
+
+
+@pytest.mark.parametrize(
+    ("mode", "expected"),
+    [
+        ("CW", "599"),
+        ("SSB", "59"),
+    ],
+)
+def test_default_rst_for_mode(mode: str, expected: str) -> None:
+    assert default_rst_for_mode(mode) == expected
+
+
+def test_entry_defaults_seed_uses_ssb_rst_default_for_ssb_station_mode() -> None:
+    now = QsoTimestamp(date(2026, 8, 30), time(9, 0))
+    defaults = EntryDefaults.seed(StationDefaults(mode="SSB"), now)
+    assert defaults.rst_sent == "59"
+    assert defaults.rst_rcvd == "59"
 
 
 def test_session_start_normalizes_my_sig_info_to_uppercase() -> None:

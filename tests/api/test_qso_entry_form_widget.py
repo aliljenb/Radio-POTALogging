@@ -229,6 +229,55 @@ def test_tab_order_follows_the_fixed_field_order(qtbot: QtBot) -> None:
     assert visited == expected[1:]
 
 
+def test_mode_change_updates_rst_sent_and_rst_rcvd_to_the_new_mode_default(qtbot: QtBot) -> None:
+    widget = QsoEntryFormWidget()
+    qtbot.addWidget(widget)
+    widget.apply_defaults(_defaults())
+    assert widget._rst_sent.text() == "599"
+    assert widget._rst_rcvd.text() == "599"
+
+    widget._mode.setCurrentText("SSB")
+    assert widget._rst_sent.text() == "59"
+    assert widget._rst_rcvd.text() == "59"
+
+    widget._mode.setCurrentText("CW")
+    assert widget._rst_sent.text() == "599"
+    assert widget._rst_rcvd.text() == "599"
+
+
+def test_mode_change_leaves_a_manually_edited_rst_field_unchanged(qtbot: QtBot) -> None:
+    widget = QsoEntryFormWidget()
+    qtbot.addWidget(widget)
+    widget.apply_defaults(_defaults())
+
+    widget._rst_sent.setText("579")
+    widget._mode.setCurrentText("SSB")
+
+    assert widget._rst_sent.text() == "579"
+    assert widget._rst_rcvd.text() == "59"
+
+
+def test_time_on_display_format_hides_seconds(qtbot: QtBot) -> None:
+    widget = QsoEntryFormWidget()
+    qtbot.addWidget(widget)
+
+    assert widget._time_on.displayFormat() == "HH:mm"
+
+
+def test_submitted_time_on_always_has_zero_seconds(qtbot: QtBot) -> None:
+    widget = QsoEntryFormWidget()
+    qtbot.addWidget(widget)
+    widget.apply_defaults(_defaults())
+    widget._call.setText("W1AW")
+    submit_button = widget.findChildren(QPushButton)[0]
+
+    with qtbot.waitSignal(widget.submitted, timeout=1000) as blocker:
+        qtbot.mouseClick(submit_button, Qt.MouseButton.LeftButton)
+
+    request: SubmitQsoRequest = blocker.args[0]
+    assert request.time_on.second == 0
+
+
 def test_show_error_then_clear_error(qtbot: QtBot) -> None:
     widget = QsoEntryFormWidget()
     qtbot.addWidget(widget)

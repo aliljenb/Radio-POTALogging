@@ -114,6 +114,37 @@ single, independently completable unit of work with a clear file target.
       Interfaces (ports)
 - [x] `exporter.py` — define `AdifExporter` protocol: `export(qsos:
       Sequence[Qso]) -> str` per design.md § Repository Interfaces (ports)
+- [x] `value_objects.py` — **modify** `QsoTimestamp`: add `__post_init__`
+      that normalizes `time_on` to zero seconds/microseconds
+      unconditionally (`object.__setattr__(self, "time_on",
+      self.time_on.replace(second=0, microsecond=0))`, since the dataclass
+      is frozen) per design.md § Value Objects, Story 14 amendment. Runs
+      for every `QsoTimestamp`, including ones deserialized from a
+      persisted session file, produced by `.plus_two_minutes()`, or built
+      from `datetime.now()`.
+- [x] `value_objects.py` — **new**: add a module-level function
+      `default_rst_for_mode(mode: str) -> str` (`{"CW": "599", "SSB":
+      "59"}[mode]`), defined next to `MODE_OPTIONS` per design.md § Value
+      Objects, Story 13 amendment — the single source of truth for the
+      MODE-dependent RST default.
+- [x] `value_objects.py` — **modify** `StationDefaults`: remove the
+      `rst_sent: str = "599"` and `rst_rcvd: str = "599"` fields — RST is
+      no longer a fixed constant per design.md § Value Objects, Story 13
+      amendment.
+- [x] `value_objects.py` — **modify** `EntryDefaults.seed`: change
+      `rst_sent=station_defaults.rst_sent,
+      rst_rcvd=station_defaults.rst_rcvd` to
+      `rst_sent=default_rst_for_mode(station_defaults.mode),
+      rst_rcvd=default_rst_for_mode(station_defaults.mode)` per design.md
+      § Value Objects, Story 13 amendment.
+- [x] `entities.py` — **modify** `LoggingSession.record_qso`: in the
+      `next_entry_defaults = EntryDefaults(...)` construction, change
+      `rst_sent=StationDefaults.rst_sent,
+      rst_rcvd=StationDefaults.rst_rcvd` to
+      `rst_sent=default_rst_for_mode(mode), rst_rcvd=default_rst_for_mode(mode)`
+      (the `mode` parameter `record_qso` was called with — the
+      just-submitted QSO's MODE, already carried forward verbatim) per
+      design.md § Overview (Story 13 amendment) and § Value Objects.
 
 ## Application Layer
 
@@ -151,6 +182,9 @@ single, independently completable unit of work with a clear file target.
       given `destination` path, returns `AdifExportResult`) per design.md
       § Commands and § Infrastructure › Repository Implementations
       (adapters)
+- [x] `dto.py` — **modify**: re-export `default_rst_for_mode` from
+      `domain/logging_session/value_objects.py`, alongside the existing
+      `MODE_OPTIONS` re-export, per design.md § DTOs, Story 13 amendment.
 
 ## Infrastructure Layer
 
@@ -335,6 +369,35 @@ Frontend Design section; this project has no `frontend/src`)
       generate_adif=...)`, `.show()` it, and run the event loop as before
       per design.md § Entry points and § Components, Story 6 amendment.
 
+- [x] `qso_entry_form_widget.py` — **modify** `QsoEntryFormWidget.__init__`:
+      add `self._rst_sent_default: str | None = None` and
+      `self._rst_rcvd_default: str | None = None`; set both whenever
+      `apply_defaults()` runs (assign from the applied
+      `EntryDefaultsDto.rst_sent`/`.rst_rcvd`); connect
+      `self._mode.currentTextChanged` to a new `_on_mode_changed(self,
+      mode: str) -> None` handler per design.md § Overview (Story 13
+      amendment) and § Components.
+- [x] `qso_entry_form_widget.py` — **new method** `_on_mode_changed(self,
+      mode: str) -> None`: guard with `if self._rst_sent_default is None:
+      return` (no-op if fired before the first `apply_defaults()` call);
+      compute `new_default = default_rst_for_mode(mode)` (imported from
+      `application/logging_session/dto.py`); if
+      `self._rst_sent.text() == self._rst_sent_default`, call
+      `self._rst_sent.setText(new_default)`; if `self._rst_rcvd.text() ==
+      self._rst_rcvd_default`, call `self._rst_rcvd.setText(new_default)`;
+      then set both `self._rst_sent_default`/`self._rst_rcvd_default` to
+      `new_default` per design.md § Overview (Story 13 amendment).
+- [x] `qso_entry_form_widget.py` — **modify** `QsoEntryFormWidget.__init__`:
+      call `self._time_on.setDisplayFormat("HH:mm")` right after
+      constructing `self._time_on = QTimeEdit()`, hiding the seconds
+      spinner section per design.md § Overview (Story 14 amendment) and §
+      Components.
+- [x] `session_setup_dialog.py` — **modify** `SessionSetupDialog.__init__`:
+      call `self._time_on.setDisplayFormat("HH:mm")` right after
+      constructing `self._time_on = QTimeEdit()`, hiding the seconds
+      spinner section per design.md § Overview (Story 14 amendment) and §
+      Components.
+
 ## Frontend
 
 N/A — this project has no `frontend/src`; see design.md § API Layer.
@@ -383,6 +446,26 @@ N/A — this project has no `frontend/src`; see design.md § API Layer.
 - [x] `tests/domain/logging_session/test_value_objects.py` — **add** a
       test (Story 9): `MODE_OPTIONS == ("CW", "SSB")` per design.md §
       Testing Strategy.
+- [x] `tests/domain/logging_session/test_value_objects.py` — **add** tests
+      (Story 13): `default_rst_for_mode("CW") == "599"` and
+      `default_rst_for_mode("SSB") == "59"`, table-driven, per design.md §
+      Testing Strategy.
+- [x] `tests/domain/logging_session/test_value_objects.py` — **add** a test
+      (Story 13): `EntryDefaults.seed(StationDefaults(mode="SSB"),
+      now).rst_sent == "59"` and `.rst_rcvd == "59"` — proves the
+      first-entry RST default follows `StationDefaults.mode`, not a fixed
+      constant, per design.md § Testing Strategy.
+- [x] `tests/domain/logging_session/test_value_objects.py` — **add** tests
+      (Story 14): `QsoTimestamp(date(2026, 8, 30), time(14, 12,
+      47)).time_on == time(14, 12, 0)` — table-driven across a few
+      nonzero-second/microsecond inputs, proving seconds/microseconds are
+      always dropped regardless of what was passed in, per design.md §
+      Testing Strategy.
+- [x] `tests/domain/logging_session/test_value_objects.py` — **add** a test
+      (Story 14): a nonzero-seconds input to
+      `QsoTimestamp(...).plus_two_minutes()` still returns a
+      `QsoTimestamp` with zero seconds, alongside the existing
+      midnight-rollover case, per design.md § Testing Strategy.
 - [x] `tests/domain/logging_session/test_entities.py` — unit tests for
       `LoggingSession.record_qso` (TIME_OFF==TIME_ON, `next_entry_defaults`
       carried forward correctly except CALL, first-entry seeding from
@@ -416,6 +499,16 @@ N/A — this project has no `frontend/src`; see design.md § API Layer.
       `next_entry_defaults.rst_rcvd == "599"` — proves an edited
       RST_SENT/RST_RCVD does not carry forward, unlike every other field
       per design.md § Testing Strategy.
+- [x] `tests/domain/logging_session/test_entities.py` — **add** a test
+      (Story 13): `LoggingSession.record_qso(..., mode="SSB",
+      rst_sent="599", rst_rcvd="599", ...)` then assert
+      `next_entry_defaults.rst_sent == "59"` and
+      `next_entry_defaults.rst_rcvd == "59"` — proves the next entry's RST
+      default follows the just-submitted QSO's MODE, not a fixed constant;
+      the existing
+      `test_record_qso_resets_rst_sent_and_rst_rcvd_instead_of_carrying_them_forward`
+      test (which submits `mode="CW"`) keeps passing unchanged, per
+      design.md § Testing Strategy.
 - [x] `tests/application/logging_session/test_commands.py` — unit tests
       for `ResumeSessionCommand`, `StartNewSessionCommand`,
       `SubmitQsoCommand`, and `GenerateAdifCommand` against fake
@@ -460,10 +553,24 @@ N/A — this project has no `frontend/src`; see design.md § API Layer.
       — **add** a test (Story 8): same as the Story 5/7 tests above, but
       for a lowercase-stored `operator` — asserts it comes back uppercase
       per design.md § Testing Strategy.
+- [x] `tests/infrastructure/repositories/test_file_logging_session_repository.py`
+      — **add** a test (Story 14): write a session JSON file with a
+      nonzero-seconds `time_on` (e.g. `"14:12:47"`, simulating data saved
+      before this change), then assert `find_unfinished()` returns a `Qso`
+      whose `timestamp.time_on.second == 0`, since normalization happens
+      in `QsoTimestamp.__post_init__` on construction regardless of where
+      the value came from, per design.md § Testing Strategy.
 - [x] `tests/infrastructure/adif/test_adif_file_exporter.py` — tests for
       `AdifFileExporter.export()` against a golden ADIF sample for a
       couple of representative QSOs, including a band-boundary frequency,
       per design.md § Testing Strategy
+- [x] `tests/infrastructure/adif/test_adif_file_exporter.py` — **add** a
+      test (Story 14): export a QSO whose `QsoTimestamp` was constructed
+      from a nonzero-seconds `time` value, and assert the resulting
+      `TIME_ON`/`TIME_OFF` ADIF fields both end in `"00"` — proving
+      `AdifFileExporter` needed no code change, since
+      `QsoTimestamp.__post_init__` already guarantees zero seconds, per
+      design.md § Testing Strategy.
 - [x] `tests/api/test_qso_entry_form_widget.py` — pytest-qt tests for
       `QsoEntryFormWidget`: pre-fill from an `EntryDefaultsDto`, CALL
       receives focus, submit emits the expected `SubmitQsoRequest` per
@@ -589,6 +696,20 @@ N/A — this project has no `frontend/src`; see design.md § API Layer.
       widget._my_sig_info, widget._qso_date, widget._mode,
       widget._operator, widget._my_rig, widget._tx_pwr]` — a black-box
       check that the `setTabOrder()` chain actually took effect per
+      design.md § Testing Strategy.
+- [x] `tests/api/test_qso_entry_form_widget.py` — **add** pytest-qt tests
+      (Story 13): with the form pre-filled at its "CW" default
+      (RST_SENT/RST_RCVD both `"599"`), selecting "SSB" in the MODE combo
+      box updates both fields to `"59"`; selecting "CW" again updates both
+      back to `"599"`; after manually editing RST_SENT to `"579"` while
+      MODE is "CW", selecting "SSB" updates only RST_RCVD to `"59"` and
+      leaves RST_SENT at `"579"` per design.md § Testing Strategy.
+- [x] `tests/api/test_qso_entry_form_widget.py` — **add** pytest-qt tests
+      (Story 14): `widget._time_on.displayFormat() == "HH:mm"`; submitting
+      the form and reading the emitted `SubmitQsoRequest.time_on` back
+      always has `.second == 0` per design.md § Testing Strategy.
+- [x] `tests/api/test_session_setup_dialog.py` — **add** a pytest-qt test
+      (Story 14): `dialog._time_on.displayFormat() == "HH:mm"` per
       design.md § Testing Strategy.
 
 ## Task Dependencies
@@ -778,3 +899,43 @@ N/A — this project has no `frontend/src`; see design.md § API Layer.
   `test_qso_entry_form_widget.py` row-order test.
 - Independent of every other amendment in this file — touches only
   `qso_entry_form_widget.py`'s layout-construction lines.
+
+### Story 13 amendment (added after Story 12 was implemented)
+
+- `value_objects.py`'s new `default_rst_for_mode` function has no
+  dependency on anything new and must land before: `value_objects.py`'s
+  `StationDefaults` field removal, `EntryDefaults.seed`'s modification,
+  `entities.py`'s `record_qso` modification, `dto.py`'s re-export, and its
+  own new test task.
+- `value_objects.py`'s `StationDefaults` field removal and
+  `EntryDefaults.seed`'s modification must land together — `seed` stops
+  reading `station_defaults.rst_sent`/`.rst_rcvd`, so landing the field
+  removal without the `seed` change (or vice versa) leaves `seed`
+  referencing removed fields.
+- `entities.py`'s `record_qso` modification depends on
+  `default_rst_for_mode` and must land before its own new
+  `test_entities.py` test.
+- `dto.py`'s re-export depends on `default_rst_for_mode` and must land
+  before `qso_entry_form_widget.py`'s `_on_mode_changed`/tracked-default
+  modification (which imports it).
+- `qso_entry_form_widget.py`'s `_on_mode_changed`/tracked-default
+  modification depends on `dto.py`'s re-export and must land before its
+  own new test cases.
+- Independent of the Story 14 tasks below — may be done in any order
+  relative to them.
+
+### Story 14 amendment (added after Story 12 was implemented)
+
+- `value_objects.py`'s new `QsoTimestamp.__post_init__` has no dependency
+  on anything new and must land before: its own new
+  `test_value_objects.py` tests, `test_file_logging_session_repository.py`'s
+  new legacy-data test, and `test_adif_file_exporter.py`'s new test — all
+  three rely on `QsoTimestamp` construction normalizing seconds.
+- `qso_entry_form_widget.py`'s `setDisplayFormat("HH:mm")` addition has no
+  dependency on anything new and must land before its own new
+  display-format/submitted-time test.
+- `session_setup_dialog.py`'s `setDisplayFormat("HH:mm")` addition has no
+  dependency on anything new and must land before its own new
+  display-format test.
+- Independent of the Story 13 tasks above — may be done in any order
+  relative to them.

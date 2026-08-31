@@ -24,6 +24,7 @@ from radio_pota_logging.application.logging_session.dto import (
     MODE_OPTIONS,
     EntryDefaultsDto,
     SubmitQsoRequest,
+    default_rst_for_mode,
 )
 
 from .uppercase_field import uppercase_as_typed
@@ -41,7 +42,10 @@ class QsoEntryFormWidget(QWidget):
         uppercase_as_typed(self._call)
         self._rst_rcvd = QLineEdit()
         self._rst_sent = QLineEdit()
+        self._rst_sent_default: str | None = None
+        self._rst_rcvd_default: str | None = None
         self._time_on = QTimeEdit()
+        self._time_on.setDisplayFormat("HH:mm")
         self._freq = QLineEdit()
         self._my_sig_info = QLineEdit()
         uppercase_as_typed(self._my_sig_info)
@@ -49,6 +53,7 @@ class QsoEntryFormWidget(QWidget):
         self._qso_date.setCalendarPopup(True)
         self._mode = QComboBox()
         self._mode.addItems(MODE_OPTIONS)
+        self._mode.currentTextChanged.connect(self._on_mode_changed)
         self._operator = QLineEdit()
         uppercase_as_typed(self._operator)
         self._my_rig = QLineEdit()
@@ -114,11 +119,24 @@ class QsoEntryFormWidget(QWidget):
         self._my_sig_info.setText(defaults.my_sig_info)
         self._rst_sent.setText(defaults.rst_sent)
         self._rst_rcvd.setText(defaults.rst_rcvd)
+        self._rst_sent_default = defaults.rst_sent
+        self._rst_rcvd_default = defaults.rst_rcvd
         self._freq.setText(defaults.freq)
         self._operator.setText(defaults.operator)
         self._my_rig.setText(defaults.my_rig)
         self._tx_pwr.setText(defaults.tx_pwr)
         self._call.setFocus()
+
+    def _on_mode_changed(self, mode: str) -> None:
+        if self._rst_sent_default is None or self._rst_rcvd_default is None:
+            return
+        new_default = default_rst_for_mode(mode)
+        if self._rst_sent.text() == self._rst_sent_default:
+            self._rst_sent.setText(new_default)
+        if self._rst_rcvd.text() == self._rst_rcvd_default:
+            self._rst_rcvd.setText(new_default)
+        self._rst_sent_default = new_default
+        self._rst_rcvd_default = new_default
 
     def show_error(self, message: str) -> None:
         self._error_label.setText(message)

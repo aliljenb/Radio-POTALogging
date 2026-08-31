@@ -44,6 +44,7 @@ class SessionSetupDialog(QDialog):
         self._qso_date.setCalendarPopup(True)
         self._qso_date.setDate(QDate(current.year, current.month, current.day))
         self._time_on = QTimeEdit()
+        self._time_on.setDisplayFormat("HH:mm")
         self._time_on.setTime(QTime(current.hour, current.minute, current.second))
         self._freq = QLineEdit()
 

@@ -237,6 +237,102 @@ construction:
 
 No domain/application change, same as the original Story 12 amendment.
 
+**Amendment (Story 13, added after Story 12 was implemented)**: RST_SENT
+and RST_RCVD stop defaulting to a fixed `"599"` and instead depend on
+MODE — `"599"` for "CW", `"59"` for "SSB". This replaces
+`StationDefaults.rst_sent`/`.rst_rcvd` (the fixed constants the Story 2
+RST reset amendment introduced) with a new module-level function,
+`default_rst_for_mode(mode: str) -> str`, defined in
+`domain/logging_session/value_objects.py` next to `MODE_OPTIONS` — a
+plain `{"CW": "599", "SSB": "59"}[mode]` lookup, no new domain exception:
+same reasoning as Story 9's amendment note (MODE only ever reaches domain
+code as `"CW"` or `"SSB"`, since the dropdown is the only entry point,
+so an invalid mode here would be a programming error, not a
+user-triggerable one worth a domain exception type). `StationDefaults`
+drops its `rst_sent`/`rst_rcvd` fields entirely, since RST is no longer a
+fixed constant. Three call sites change:
+
+1. `EntryDefaults.seed(...)` computes `rst_sent=default_rst_for_mode(station_defaults.mode)`
+   and `rst_rcvd=default_rst_for_mode(station_defaults.mode)` instead of
+   reading `station_defaults.rst_sent`/`.rst_rcvd` — for the first entry
+   of a session this is still `"599"`, since `StationDefaults.mode`
+   defaults to `"CW"`.
+2. `LoggingSession.record_qso`'s `next_entry_defaults` construction uses
+   `default_rst_for_mode(mode)` (the `mode` parameter it was called
+   with — the just-submitted QSO's mode, already carried forward
+   verbatim per Story 9) instead of `StationDefaults.rst_sent`/`.rst_rcvd`.
+3. `default_rst_for_mode` is re-exported from
+   `application/logging_session/dto.py`, the same way `MODE_OPTIONS`
+   already is, so `api/` can use it without importing `domain/` directly.
+
+The live-update behavior (changing MODE on the current, not-yet-submitted
+form updates RST_SENT/RST_RCVD, unless the operator already edited one
+away from the previous mode's default) is a `QsoEntryFormWidget`-only
+change: the widget gains two tracked attributes, `self._rst_sent_default`
+and `self._rst_rcvd_default`, set to the applied `EntryDefaultsDto`'s
+`rst_sent`/`rst_rcvd` every time `apply_defaults()` runs (first entry or
+next-entry pre-fill). `self._mode.currentTextChanged` is connected (in
+`__init__`, after the fields and their initial defaults are set — a
+`self._rst_sent_default is not None` guard makes the connection safe
+regardless of exactly when Qt fires the signal during construction) to a
+new `_on_mode_changed(mode: str)` handler:
+
+```
+new_default = default_rst_for_mode(mode)
+if self._rst_sent.text() == self._rst_sent_default:
+    self._rst_sent.setText(new_default)
+if self._rst_rcvd.text() == self._rst_rcvd_default:
+    self._rst_rcvd.setText(new_default)
+self._rst_sent_default = new_default
+self._rst_rcvd_default = new_default
+```
+
+Each field is compared independently against its own tracked default, so
+an edit to one doesn't block the other from still following MODE — matching
+requirements Story 13's "independently" criterion. No change to
+`_on_submit_clicked()`: it already reads whatever text is currently in
+`self._rst_sent`/`self._rst_rcvd`, edited or not.
+
+**Amendment (Story 14, added after Story 12 was implemented)**: TIME_ON
+(and therefore TIME_OFF, which is always read as equal to it) always has
+its seconds component fixed at zero. Enforced once, at the source of
+truth: `QsoTimestamp` gains a `__post_init__` that unconditionally
+normalizes `time_on` — `object.__setattr__(self, "time_on",
+self.time_on.replace(second=0, microsecond=0))` — the same
+frozen-dataclass normalization pattern Story 5/7/8 already use for
+`call`/`my_sig_info`/`operator`. Because every `QsoTimestamp` in the
+codebase (operator input via `record_qso`, `EntryDefaults.seed`'s `now`
+argument, `plus_two_minutes()`'s returned instance, and one deserialized
+from a persisted session file) goes through this same `__init__`, this
+one change is sufficient to guarantee the invariant everywhere — no
+change is needed to `plus_two_minutes()` itself (it already just calls
+`QsoTimestamp(combined.date(), combined.time())`, which now normalizes on
+construction) nor to `FileLoggingSessionRepository` (same reasoning as
+Story 5's uppercase amendment: normalization happens on construction
+regardless of where the value came from, so a legacy session file with a
+nonzero-seconds `time_on` is corrected on load).
+
+`AdifFileExporter` needs **no change**: it already formats `TIME_ON`/
+`TIME_OFF` via `strftime("%H%M%S")` — a 6-digit `HHMMSS` string — so once
+`QsoTimestamp` guarantees zero seconds, that format already produces the
+required `<TIME_ON:6>141200`-style output (seconds digits always `"00"`)
+for free.
+
+The remaining acceptance criterion — no seconds component is ever
+*entered or displayed* — is a UI-only change, since it's about what the
+operator sees, not what gets stored (which `QsoTimestamp` already
+guarantees regardless). Both `QTimeEdit` instances that represent
+TIME_ON — `QsoEntryFormWidget._time_on` and
+`SessionSetupDialog._time_on` ("Time of first QSO") — call
+`setDisplayFormat("HH:mm")` right after construction, which removes the
+seconds spinner section entirely (Qt's default `QTimeEdit` format is
+`"HH:mm:ss"`). Both widgets keep reading `.second()` off the underlying
+`QTime` when building the domain `time` value (`time_on_value.second()`)
+unchanged — with no seconds spinner, that value stays whatever it was
+constructed with, and `QsoTimestamp.__post_init__` normalizes it to zero
+regardless, so touching that read isn't necessary for correctness; it's
+left as-is to keep this a minimal, single-purpose change.
+
 ## Domain Model
 
 > Pure business logic. Zero framework/infra imports. Lives under
@@ -272,10 +368,11 @@ No domain/application change, same as the original Story 12 amendment.
 | `SessionId` | wraps a UUID | generated once at session creation; opaque, immutable |
 | `Frequency` | decimal MHz value | parsed from a string like `"14.062"`; raises `FrequencyFormatError` if not a valid decimal; `.band` property raises `FrequencyOutOfBandError` if no table row matches |
 | `Band` | one of `160M, 80M, 40M, 30M, 20M, 17M, 15M, 12M, 10M, 6M` | constructed only via `Frequency.band`; never built directly from user input |
-| `QsoTimestamp` | `qso_date: date`, `time_on: time` (both UTC, no tz conversion) | `.plus_two_minutes()` returns a new `QsoTimestamp`, using `datetime` arithmetic so a midnight rollover advances `qso_date` for free |
-| `StationDefaults` | `operator, mode, my_sig, rst_sent, rst_rcvd, my_rig, tx_pwr` | fixed application constants (`SM6Y`, `CW`, `POTA`, `599`, `599`, `Elecraft KX2`, `5`); immutable, defined once in the domain layer |
-| `EntryDefaults` | `operator, mode, my_sig_info, rst_sent, rst_rcvd, freq, my_rig, tx_pwr, timestamp: QsoTimestamp` (everything a future form pre-fills **except CALL**) | Two ways to obtain one: `EntryDefaults.seed(StationDefaults, now, my_sig_info="", freq="")` (QSO_DATE/TIME_ON = now; `my_sig_info`/`freq` each default to `""` but are passed as the operator's park reference and starting frequency for a brand-new session — Story 6) for a brand-new session, or `LoggingSession.record_qso(...)` derives the next one by carrying every field forward from the just-submitted QSO **except `rst_sent`/`rst_rcvd`, which are always reset to `StationDefaults.rst_sent`/`.rst_rcvd` ("599") instead of being carried forward (Story 2 RST reset amendment)** and advancing the timestamp by 2 minutes; **`my_sig_info` and `operator` are each normalized to uppercase in its own `__post_init__`** (same `object.__setattr__` pattern as `Qso`), independent of `Qso`'s normalization — see the Story 7 amendment note under Overview for why both are needed (Story 8 repeats it for `operator`) |
-| `Qso` | `call, timestamp: QsoTimestamp, mode, my_sig, my_sig_info, rst_sent, rst_rcvd, freq: Frequency, operator, my_rig, tx_pwr` | Immutable once created via `LoggingSession.record_qso`; `time_off` is always read as equal to `timestamp.time_on` (no separate stored field, so the invariant can't drift); `band` is a derived property (`freq.band`), never stored redundantly; **`call`, `my_sig_info`, and `operator` are each normalized to uppercase in `__post_init__`** (`object.__setattr__`, since the dataclass is frozen) — non-letter characters (digits, `/`, `-`) pass through unchanged because `str.upper()` only affects cased characters; this runs for every `Qso`, including ones deserialized from a persisted session file (requirements Story 5 for `call`, Story 7 for `my_sig_info`, Story 8 for `operator`) |
+| `QsoTimestamp` | `qso_date: date`, `time_on: time` (both UTC, no tz conversion) | `.plus_two_minutes()` returns a new `QsoTimestamp`, using `datetime` arithmetic so a midnight rollover advances `qso_date` for free; **`__post_init__` normalizes `time_on` to zero seconds/microseconds unconditionally** (`object.__setattr__`, same frozen-dataclass pattern as `Qso`), so every `QsoTimestamp` — operator input, `.plus_two_minutes()`'s result, or one deserialized from a persisted session file — always has whole-minute precision (Story 14) |
+| `StationDefaults` | `operator, mode, my_sig, my_rig, tx_pwr` | fixed application constants (`SM6Y`, `CW`, `POTA`, `Elecraft KX2`, `5`); immutable, defined once in the domain layer; **no longer carries `rst_sent`/`rst_rcvd`** — those are now derived from MODE via `default_rst_for_mode()` (Story 13) rather than fixed |
+| `default_rst_for_mode` | function, `(mode: str) -> str` | not a class — `{"CW": "599", "SSB": "59"}[mode]`, defined once in `value_objects.py` next to `MODE_OPTIONS`; the single source of truth for the MODE-dependent RST default (Story 13); re-exported from `application/logging_session/dto.py` since `api/` never imports `domain/` directly, same as `MODE_OPTIONS` |
+| `EntryDefaults` | `operator, mode, my_sig_info, rst_sent, rst_rcvd, freq, my_rig, tx_pwr, timestamp: QsoTimestamp` (everything a future form pre-fills **except CALL**) | Two ways to obtain one: `EntryDefaults.seed(StationDefaults, now, my_sig_info="", freq="")` (QSO_DATE/TIME_ON = now; `my_sig_info`/`freq` each default to `""` but are passed as the operator's park reference and starting frequency for a brand-new session — Story 6; `rst_sent`/`rst_rcvd` come from `default_rst_for_mode(station_defaults.mode)` — Story 13) for a brand-new session, or `LoggingSession.record_qso(...)` derives the next one by carrying every field forward from the just-submitted QSO **except `rst_sent`/`rst_rcvd`, which are always reset to `default_rst_for_mode(mode)` instead of being carried forward (Story 2 RST reset amendment, refined by Story 13)** and advancing the timestamp by 2 minutes; **`my_sig_info` and `operator` are each normalized to uppercase in its own `__post_init__`** (same `object.__setattr__` pattern as `Qso`), independent of `Qso`'s normalization — see the Story 7 amendment note under Overview for why both are needed (Story 8 repeats it for `operator`) |
+| `Qso` | `call, timestamp: QsoTimestamp, mode, my_sig, my_sig_info, rst_sent, rst_rcvd, freq: Frequency, operator, my_rig, tx_pwr` | Immutable once created via `LoggingSession.record_qso`; `time_off` is always read as equal to `timestamp.time_on` (no separate stored field, so the invariant can't drift, including the whole-minute invariant — Story 14); `band` is a derived property (`freq.band`), never stored redundantly; **`call`, `my_sig_info`, and `operator` are each normalized to uppercase in `__post_init__`** (`object.__setattr__`, since the dataclass is frozen) — non-letter characters (digits, `/`, `-`) pass through unchanged because `str.upper()` only affects cased characters; this runs for every `Qso`, including ones deserialized from a persisted session file (requirements Story 5 for `call`, Story 7 for `my_sig_info`, Story 8 for `operator`) |
 | `MODE_OPTIONS` | module-level constant, `("CW", "SSB")` | not a class — a fixed tuple defined once in `value_objects.py`; the single source of truth for which MODE values exist, populating the entry form's dropdown (Story 9); `StationDefaults.mode` (`"CW"`) is always one of these values; re-exported from `application/logging_session/dto.py` since `api/` never imports `domain/` directly (see the Story 9 amendment note under Overview) |
 
 ### Domain Events
@@ -353,6 +450,10 @@ would just duplicate that data.
 - `MODE_OPTIONS` — not a DTO, but re-exported here from `domain/logging_session/value_objects.py`
   (Story 9) so `api/` can populate the MODE dropdown without importing
   `domain/` directly.
+- `default_rst_for_mode` — likewise not a DTO, re-exported here from
+  `domain/logging_session/value_objects.py` (Story 13) so
+  `QsoEntryFormWidget` can recompute the MODE-dependent RST default when
+  the operator changes MODE, without importing `domain/` directly.
 
 `SubmitQsoCommand` raises the domain exceptions above rather than
 returning a boolean/error-flag DTO, so the presentation layer handles
@@ -414,10 +515,10 @@ satisfying "without discarding the previous session's persisted file."
 |-----------|-----------------|------------------------|
 | `MainWindow` | Host the form, the QSO list, and the "Generate ADIF" action, rendering the `SessionStartResult` it's given at construction; size itself to half the primary screen's width and three-quarters its height at construction (Story 10) | none of the startup commands/query directly — just the `SessionStartResult` passed in, plus `submit_qso`/`generate_adif` for `QsoEntryController` |
 | `SessionResumePromptDialog` | Ask the operator, once at startup, to resume or start clean | none (pure dialog; the choice drives which branch `bootstrap_session()` takes) |
-| `SessionSetupDialog` | Collect the park reference, date, start time, and starting frequency for a new session, or report that the operator chose to quit; disable "OK" while the park reference or frequency is empty; uppercase the park reference live as typed via `uppercase_as_typed()` (Story 7) (Story 6) | none (pure dialog; exposes `.setup_result: SessionSetupResult \| None` after `.exec()` — named to avoid shadowing `QDialog`'s own `.result()` method, the same reason `SessionResumePromptDialog` uses `.choice`) |
+| `SessionSetupDialog` | Collect the park reference, date, start time, and starting frequency for a new session, or report that the operator chose to quit; disable "OK" while the park reference or frequency is empty; uppercase the park reference live as typed via `uppercase_as_typed()` (Story 7); its "Time of first QSO" `QTimeEdit` uses `setDisplayFormat("HH:mm")`, hiding seconds entry (Story 14) (Story 6) | none (pure dialog; exposes `.setup_result: SessionSetupResult \| None` after `.exec()` — named to avoid shadowing `QDialog`'s own `.result()` method, the same reason `SessionResumePromptDialog` uses `.choice`) |
 | `session_bootstrap.bootstrap_session()` | Run the startup sequence (resume prompt if applicable, then either resume or the setup dialog + `StartNewSessionCommand`) and decide whether the app should proceed at all | `CheckForResumableSessionQuery`, `ResumeSessionCommand`, `StartNewSessionCommand`; shows `SessionResumePromptDialog`/`SessionSetupDialog` |
 | `uppercase_field.uppercase_as_typed(line_edit)` | Make one `QLineEdit` uppercase its text live as the operator types, preserving cursor position (Story 5/7) | none (pure Qt helper; called once per field during widget `__init__`) |
-| `QsoEntryFormWidget` | Render the 11 entry fields in 3 columns — column 1: CALL, RST_RCVD, RST_SENT, TIME_ON; column 2: FREQ, MY_SIG_INFO, QSO_DATE, MODE; column 3: OPERATOR, MY_RIG, TX_PWR (Story 12) — and emit the submitted values; apply a new `EntryDefaultsDto` to pre-fill itself and focus CALL; uppercase CALL, MY_SIG_INFO, and OPERATOR live as the operator types, via `uppercase_as_typed()` (requirements Story 5, 7, 8); render MODE as a non-editable `QComboBox` populated from `MODE_OPTIONS`, defaulting to "CW" (Story 9); submit on Enter/Return from any field when CALL is non-empty, via an `eventFilter` installed on all 11 fields (Story 11); Tab through the 11 fields column-major, in the same fixed order as their pre-column-layout sequence, via an explicit `setTabOrder()` chain (Story 12) | emits `SubmitQsoRequest` via a Qt signal |
+| `QsoEntryFormWidget` | Render the 11 entry fields in 3 columns — column 1: CALL, RST_RCVD, RST_SENT, TIME_ON; column 2: FREQ, MY_SIG_INFO, QSO_DATE, MODE; column 3: OPERATOR, MY_RIG, TX_PWR (Story 12) — and emit the submitted values; apply a new `EntryDefaultsDto` to pre-fill itself and focus CALL; uppercase CALL, MY_SIG_INFO, and OPERATOR live as the operator types, via `uppercase_as_typed()` (requirements Story 5, 7, 8); render MODE as a non-editable `QComboBox` populated from `MODE_OPTIONS`, defaulting to "CW" (Story 9); update RST_SENT/RST_RCVD to the new MODE's default when MODE changes, for each field not already edited away from its previous default (Story 13); submit on Enter/Return from any field when CALL is non-empty, via an `eventFilter` installed on all 11 fields (Story 11); its TIME_ON `QTimeEdit` uses `setDisplayFormat("HH:mm")`, hiding seconds entry (Story 14); Tab through the 11 fields column-major, in the same fixed order as their pre-column-layout sequence, via an explicit `setTabOrder()` chain (Story 12) | emits `SubmitQsoRequest` via a Qt signal |
 | `QsoListWidget` | Display submitted QSOs, in order, read-only | renders `QsoDto` rows appended to it |
 | `QsoEntryController` | Wire widget signals to application commands/queries and route results/errors back to the widgets | `SubmitQsoCommand`, `GenerateAdifCommand` |
 | `composition_root.py` (`main`) | Construct the concrete adapters, run `bootstrap_session()`, and — only if it returns a result rather than `None` — construct/show `MainWindow` and run the Qt event loop | — |
@@ -496,7 +597,24 @@ Mirrors `src/` under `tests/`.
   do **not** carry forward, unlike every other field; the existing
   `test_record_qso_carries_defaults_forward_except_call_and_advances_time_on`
   test (which submits `rst_sent="599", rst_rcvd="599"` already) is
-  unaffected since it never exercised a non-default value.
+  unaffected since it never exercised a non-default value. Story 13:
+  `default_rst_for_mode("CW") == "599"` and `default_rst_for_mode("SSB")
+  == "59"` (direct, table-driven); `EntryDefaults.seed(StationDefaults(),
+  now).rst_sent == "599"` (first-entry default, `StationDefaults.mode`
+  is `"CW"`); `LoggingSession.record_qso(..., mode="SSB", rst_sent="599",
+  rst_rcvd="599", ...).next_entry_defaults.rst_sent == "59"` and
+  `.rst_rcvd == "59"` — proves the next entry's RST default follows the
+  *just-submitted* QSO's MODE, not the previous entry's RST values; the
+  existing `test_record_qso_resets_rst_sent_and_rst_rcvd_instead_of_carrying_them_forward`
+  test (submits `mode="CW"` implicitly, asserting `"599"`) keeps passing
+  unchanged. Story 14: `QsoTimestamp(date(2026, 8, 30),
+  time(14, 12, 47)).time_on == time(14, 12, 0)` — seconds/microseconds
+  dropped regardless of what was passed in; `QsoTimestamp(date(2026, 8,
+  30), time(23, 59, 30)).plus_two_minutes()` still equals `QsoTimestamp(date(2026,
+  8, 31), time(0, 1, 0))` (the existing midnight-rollover test, unaffected
+  since its input already had zero seconds — a new table-driven case adds
+  a nonzero-seconds input to prove normalization survives the rollover
+  arithmetic too).
 - **Application** (`tests/application/logging_session/`): each command/query
   tested against fake `LoggingSessionRepository`/`AdifExporter` doubles —
   no real file I/O. Story 6: `StartNewSessionCommand(...).execute(...,
@@ -512,7 +630,15 @@ Mirrors `src/` under `tests/`.
   loaded via `find_unfinished()` and asserted to come back uppercase,
   since normalization happens in `Qso.__post_init__` on construction
   regardless of where the value came from. Story 7: the same test
-  repeated for a lowercase-stored `my_sig_info`.
+  repeated for a lowercase-stored `my_sig_info`. Story 14: a session JSON
+  file with a nonzero-seconds `time_on` (e.g. `"14:12:47"`, simulating
+  data from before this change) is loaded via `find_unfinished()` and
+  asserted to come back with `time_on.second == 0`, same reasoning as
+  Story 5/7 — normalization happens in `QsoTimestamp.__post_init__` on
+  construction, regardless of where the value came from; the golden ADIF
+  sample's `TIME_ON`/`TIME_OFF` values are asserted to end in `"00"`
+  (proving `AdifFileExporter` needed no code change to satisfy the new
+  format requirement).
 - **GUI** (`tests/api/`): widget-level tests using **pytest-qt** (approved
   exception to `.claude/rules/testing.md`'s Playwright rule for this
   feature — Playwright cannot drive a PyQt window; recorded in
@@ -577,9 +703,34 @@ Mirrors `src/` under `tests/`.
   (`widget._call, widget._rst_rcvd, ...`) in that same original order — a
   black-box check that the `setTabOrder()` chain's actual effect is
   unaffected by the column-layout amendment, not just that the calls were
-  made.
+  made. Story 13: with the form pre-filled at its "CW" default (RST_SENT/
+  RST_RCVD both `"599"`), selecting "SSB" in the MODE combo box updates
+  both to `"59"`; selecting "CW" again updates both back to `"599"`;
+  after manually editing RST_SENT to `"579"` while MODE is "CW", selecting
+  "SSB" updates only RST_RCVD to `"59"` and leaves RST_SENT at `"579"` —
+  proving the two fields are tracked independently and an edited field is
+  never silently overwritten. Story 14: the TIME_ON `QTimeEdit`'s
+  `displayFormat()` equals `"HH:mm"` (no seconds section); submitting the
+  form and reading the emitted `SubmitQsoRequest.time_on` back always has
+  `.second == 0`, regardless of what the underlying `QTime` reports.
 
 ## Open Questions / Risks
+
+None currently outstanding for Story 13 or Story 14. Story 13 is a
+mechanical generalization of the already-implemented Story 2 RST reset:
+the fixed `StationDefaults.rst_sent`/`.rst_rcvd` constants become a
+`default_rst_for_mode()` lookup, reusing the exact call sites that
+constant already had; the live-update-on-MODE-change behavior has one
+reasonable shape — track each field's last-applied default and compare
+against current text before overwriting — since that's the only way to
+tell "still at the default" apart from "operator edited it" without a
+separate dirty flag. Story 14 has one reasonable shape too: normalize in
+`QsoTimestamp.__post_init__`, the same pattern Story 5/7/8 already
+established for `call`/`my_sig_info`/`operator`, which turns out to
+require no `plus_two_minutes()` or `AdifFileExporter` change at all — the
+ADIF exporter already used the 6-digit `%H%M%S` format the requirement
+asks for; it just never had a guarantee the seconds digits were zero
+until now.
 
 None currently outstanding for the Story 2 RST reset, the Story 10 height
 fraction change, or Story 12. All three open questions from
