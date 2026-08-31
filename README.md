@@ -6,8 +6,9 @@ log after a Parks On The Air (POTA) activation, and exporting them as an
 
 ## Status
 
-The `qso-entering` and `app-launcher` features are implemented — see
-[`specs/qso-entering/`](specs/qso-entering/) and
+The `qso-entering`, `adif-generation`, and `app-launcher` features are
+implemented — see [`specs/qso-entering/`](specs/qso-entering/),
+[`specs/adif-generation/`](specs/adif-generation/), and
 [`specs/app-launcher/`](specs/app-launcher/) for their requirements,
 design, and task breakdowns.
 
