@@ -260,9 +260,10 @@ None. (See rationale under Aggregates/above.)
 - `AdifExporter` (`domain/logging_session/exporter.py`) — an outbound port
   for the one piece of "external data" the aggregate's QSOs need to become:
   - `export(qsos: Sequence[Qso]) -> str` — returns ADIF-formatted text for
-    the given QSOs, in the fixed 14-field record shape from requirements
-    Story 4. Writing that text to a filesystem path is an infrastructure
-    concern (see below), not part of this port.
+    the given QSOs, in the fixed 14-field record shape from the
+    adif-generation feature's requirements Story 1. Writing that text to a
+    filesystem path is an infrastructure concern (see below), not part of
+    this port.
 
 ## Application Layer (Use Cases)
 
@@ -341,8 +342,9 @@ satisfying "without discarding the previous session's persisted file."
   implements `LoggingSessionRepository` by reading/writing the JSON file
   above.
 - `AdifFileExporter` (`infrastructure/adif/`) — implements `AdifExporter`
-  by formatting an ADIF 3.x record per QSO (14 fields from requirements
-  Story 4) and returning the joined text; a thin
+  by formatting an ADIF 3.x record per QSO (14 fields from the
+  adif-generation feature's requirements Story 1) and returning the joined
+  text; a thin
   `write_text(path, content)` call (used by `GenerateAdifCommand`'s
   caller) is the only actual file I/O, kept out of the exporter itself so
   `AdifExporter.export()` stays a pure string transform and is trivially
