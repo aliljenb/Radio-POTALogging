@@ -15,3 +15,19 @@ class CheckForResumableSessionQuery:
 
     def execute(self) -> bool:
         return self.repository.find_unfinished() is not None
+
+
+@dataclass(frozen=True)
+class SuggestAdifFilenameQuery:
+    """A default filename for the current session's ADIF export."""
+
+    repository: LoggingSessionRepository
+
+    def execute(self) -> str:
+        session = self.repository.find_unfinished()
+        if session is None:
+            raise RuntimeError(
+                "No current logging session; call StartNewSessionCommand or ResumeSessionCommand first"
+            )
+        start = session.session_start
+        return f"{start.qso_date:%Y%m%d}-{start.my_sig_info}.adi"

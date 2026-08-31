@@ -1,11 +1,14 @@
 import os
 import shlex
+import shutil
 import stat
 import subprocess
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-LAUNCH_SCRIPT = PROJECT_ROOT / "macos" / "POTA QSO Logging.app" / "Contents" / "MacOS" / "launch"
+REAL_LAUNCH_SCRIPT = (
+    PROJECT_ROOT / "macos" / "POTA QSO Logging.app" / "Contents" / "MacOS" / "launch"
+)
 
 
 def _make_executable(path: Path, content: str) -> None:
@@ -24,25 +27,66 @@ def _stub_bin_dir(tmp_path: Path, osascript_record: Path) -> Path:
     return bin_dir
 
 
+def _make_fake_clone(clone_root: Path) -> Path:
+    """Reproduce macos/POTA QSO Logging.app/Contents/MacOS/launch under clone_root,
+    so launch's own SCRIPT_DIR/PROJECT_DIR resolution runs unmodified and is
+    itself under test. Returns the path to the copied launch script."""
+    launch_copy = (
+        clone_root / "macos" / "POTA QSO Logging.app" / "Contents" / "MacOS" / "launch"
+    )
+    launch_copy.parent.mkdir(parents=True)
+    shutil.copyfile(REAL_LAUNCH_SCRIPT, launch_copy)
+    mode = launch_copy.stat().st_mode
+    launch_copy.chmod(mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    return launch_copy
+
+
 def _run_launch(
-    *, project_dir: Path, home: Path, bin_dir: Path
+    *, launch_script: Path, home: Path, bin_dir: Path
 ) -> subprocess.CompletedProcess[str]:
     env = dict(os.environ)
-    env["POTA_LAUNCHER_PROJECT_DIR"] = str(project_dir)
     env["HOME"] = str(home)
     env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
-    return subprocess.run([str(LAUNCH_SCRIPT)], capture_output=True, text=True, env=env)
+    return subprocess.run([str(launch_script)], capture_output=True, text=True, env=env)
+
+
+def test_resolves_project_dir_from_bundle_location_regardless_of_where_the_clone_lives(
+    tmp_path: Path,
+) -> None:
+    for name in ("clone-one", "clone-two"):
+        clone_root = tmp_path / name
+        clone_root.mkdir()
+        launch_script = _make_fake_clone(clone_root)
+        home = clone_root / "home"
+        home.mkdir()
+        osascript_record = clone_root / "osascript-calls.txt"
+        bin_dir = _stub_bin_dir(clone_root, osascript_record)
+        record_file = clone_root / "python-record.txt"
+        _make_executable(
+            clone_root / ".venv" / "bin" / "python",
+            "#!/bin/sh\n"
+            f"pwd > {shlex.quote(str(record_file))}\n"
+            f'echo "$@" >> {shlex.quote(str(record_file))}\n'
+            "exit 0\n",
+        )
+
+        result = _run_launch(launch_script=launch_script, home=home, bin_dir=bin_dir)
+
+        recorded = record_file.read_text().splitlines()
+        assert result.returncode == 0
+        assert recorded[0] == str(home / "POTA Logs")
+        assert recorded[1] == "-m radio_pota_logging.api.composition_root"
+        assert not osascript_record.exists()
 
 
 def test_shows_alert_and_exits_nonzero_when_venv_missing(tmp_path: Path) -> None:
-    project_dir = tmp_path / "project"
-    project_dir.mkdir()
+    launch_script = _make_fake_clone(tmp_path)
     home = tmp_path / "home"
     home.mkdir()
     osascript_record = tmp_path / "osascript-calls.txt"
     bin_dir = _stub_bin_dir(tmp_path, osascript_record)
 
-    result = _run_launch(project_dir=project_dir, home=home, bin_dir=bin_dir)
+    result = _run_launch(launch_script=launch_script, home=home, bin_dir=bin_dir)
 
     assert result.returncode != 0
     assert osascript_record.exists()
@@ -50,21 +94,21 @@ def test_shows_alert_and_exits_nonzero_when_venv_missing(tmp_path: Path) -> None
 
 
 def test_creates_logs_dir_and_runs_python_with_expected_argv_and_cwd(tmp_path: Path) -> None:
-    project_dir = tmp_path / "project"
+    launch_script = _make_fake_clone(tmp_path)
     home = tmp_path / "home"
     home.mkdir()
     osascript_record = tmp_path / "osascript-calls.txt"
     bin_dir = _stub_bin_dir(tmp_path, osascript_record)
     record_file = tmp_path / "python-record.txt"
     _make_executable(
-        project_dir / ".venv" / "bin" / "python",
+        tmp_path / ".venv" / "bin" / "python",
         "#!/bin/sh\n"
         f"pwd > {shlex.quote(str(record_file))}\n"
         f'echo "$@" >> {shlex.quote(str(record_file))}\n'
         "exit 0\n",
     )
 
-    result = _run_launch(project_dir=project_dir, home=home, bin_dir=bin_dir)
+    result = _run_launch(launch_script=launch_script, home=home, bin_dir=bin_dir)
 
     logs_dir = home / "POTA Logs"
     recorded = record_file.read_text().splitlines()
@@ -76,7 +120,7 @@ def test_creates_logs_dir_and_runs_python_with_expected_argv_and_cwd(tmp_path: P
 
 
 def test_does_not_touch_existing_logs_directory_contents(tmp_path: Path) -> None:
-    project_dir = tmp_path / "project"
+    launch_script = _make_fake_clone(tmp_path)
     home = tmp_path / "home"
     home.mkdir()
     logs_dir = home / "POTA Logs"
@@ -85,26 +129,26 @@ def test_does_not_touch_existing_logs_directory_contents(tmp_path: Path) -> None
     marker.write_text("keep me")
     osascript_record = tmp_path / "osascript-calls.txt"
     bin_dir = _stub_bin_dir(tmp_path, osascript_record)
-    _make_executable(project_dir / ".venv" / "bin" / "python", "#!/bin/sh\nexit 0\n")
+    _make_executable(tmp_path / ".venv" / "bin" / "python", "#!/bin/sh\nexit 0\n")
 
-    result = _run_launch(project_dir=project_dir, home=home, bin_dir=bin_dir)
+    result = _run_launch(launch_script=launch_script, home=home, bin_dir=bin_dir)
 
     assert result.returncode == 0
     assert marker.read_text() == "keep me"
 
 
 def test_shows_alert_with_exit_code_and_log_path_on_crash(tmp_path: Path) -> None:
-    project_dir = tmp_path / "project"
+    launch_script = _make_fake_clone(tmp_path)
     home = tmp_path / "home"
     home.mkdir()
     osascript_record = tmp_path / "osascript-calls.txt"
     bin_dir = _stub_bin_dir(tmp_path, osascript_record)
     _make_executable(
-        project_dir / ".venv" / "bin" / "python",
+        tmp_path / ".venv" / "bin" / "python",
         "#!/bin/sh\necho 'boom: simulated crash' 1>&2\nexit 1\n",
     )
 
-    result = _run_launch(project_dir=project_dir, home=home, bin_dir=bin_dir)
+    result = _run_launch(launch_script=launch_script, home=home, bin_dir=bin_dir)
 
     log_file = home / "POTA Logs" / "launcher.log"
     assert result.returncode == 1

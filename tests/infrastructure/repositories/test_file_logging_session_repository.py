@@ -41,6 +41,21 @@ def test_save_then_find_unfinished_round_trips(tmp_path: Path) -> None:
     assert reloaded.qsos[0].call == "W1AW"
     assert reloaded.qsos[0].freq.megahertz == session.qsos[0].freq.megahertz
     assert reloaded.next_entry_defaults == session.next_entry_defaults
+    assert reloaded.session_start == session.session_start
+
+
+def test_save_then_find_unfinished_preserves_session_start(tmp_path: Path) -> None:
+    session = LoggingSession.start(
+        StationDefaults(), QsoTimestamp(date(2026, 8, 30), time(9, 0)), my_sig_info="k-1234"
+    )
+    repository = FileLoggingSessionRepository(tmp_path)
+    repository.save(session)
+
+    reloaded = repository.find_unfinished()
+
+    assert reloaded is not None
+    assert reloaded.session_start.qso_date == date(2026, 8, 30)
+    assert reloaded.session_start.my_sig_info == "K-1234"
 
 
 def test_archive_renames_file_without_deleting_data(tmp_path: Path) -> None:
@@ -85,6 +100,7 @@ def test_find_unfinished_normalizes_a_legacy_lowercase_call(tmp_path: Path) -> N
             "tx_pwr": "5",
             "timestamp": {"qso_date": "2026-08-30", "time_on": "09:02:00"},
         },
+        "session_start": {"qso_date": "2026-08-30", "my_sig_info": "K-1234"},
     }
     (tmp_path / ".qso_session.json").write_text(json.dumps(legacy_session))
     repository = FileLoggingSessionRepository(tmp_path)
@@ -124,6 +140,7 @@ def test_find_unfinished_normalizes_a_legacy_lowercase_my_sig_info(tmp_path: Pat
             "tx_pwr": "5",
             "timestamp": {"qso_date": "2026-08-30", "time_on": "09:02:00"},
         },
+        "session_start": {"qso_date": "2026-08-30", "my_sig_info": "K-1234"},
     }
     (tmp_path / ".qso_session.json").write_text(json.dumps(legacy_session))
     repository = FileLoggingSessionRepository(tmp_path)
@@ -164,6 +181,7 @@ def test_find_unfinished_normalizes_a_legacy_lowercase_operator(tmp_path: Path) 
             "tx_pwr": "5",
             "timestamp": {"qso_date": "2026-08-30", "time_on": "09:02:00"},
         },
+        "session_start": {"qso_date": "2026-08-30", "my_sig_info": "K-1234"},
     }
     (tmp_path / ".qso_session.json").write_text(json.dumps(legacy_session))
     repository = FileLoggingSessionRepository(tmp_path)

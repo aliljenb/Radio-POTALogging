@@ -9,6 +9,7 @@ from radio_pota_logging.application.logging_session.commands import (
     SubmitQsoCommand,
 )
 from radio_pota_logging.application.logging_session.dto import SessionStartResult
+from radio_pota_logging.application.logging_session.queries import SuggestAdifFilenameQuery
 
 from .qso_entry_controller import QsoEntryController
 from .qso_entry_form_widget import QsoEntryFormWidget
@@ -23,6 +24,7 @@ class MainWindow(QMainWindow):
         initial_result: SessionStartResult,
         submit_qso: SubmitQsoCommand,
         generate_adif: GenerateAdifCommand,
+        suggest_adif_filename: SuggestAdifFilenameQuery,
     ) -> None:
         super().__init__()
         self.setWindowTitle("POTA QSO Logging")
@@ -36,6 +38,7 @@ class MainWindow(QMainWindow):
             qso_list=self.qso_list,
             submit_command=submit_qso,
             generate_adif_command=generate_adif,
+            suggest_adif_filename_command=suggest_adif_filename,
             dialog_parent=self,
         )
         generate_adif_button.clicked.connect(self.controller.generate_adif)

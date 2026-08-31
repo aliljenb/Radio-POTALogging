@@ -31,36 +31,57 @@ needed for it here.
       design.md § `Contents/Info.plist`: `CFBundleName` = `POTA QSO
       Logging`, `CFBundleIdentifier` = `local.radio-pota-logging.launcher`,
       `CFBundlePackageType` = `APPL`, `CFBundleExecutable` = `launch`,
-      `CFBundleShortVersionString` = `1.0`. No `CFBundleIconFile`,
-      `LSUIElement`, or `LSBackgroundOnly` keys.
-- [x] `Contents/MacOS/launch` — create the POSIX shell script exactly as
-      specified in design.md § `Contents/MacOS/launch` (reads
-      `POTA_LAUNCHER_PROJECT_DIR` with the hardcoded project path as
-      default; alerts via `osascript` and exits `1` if `.venv/bin/python`
-      is not executable; creates `~/POTA Logs` if missing; `cd`s into it;
-      runs the app with output redirected to
+      `CFBundleShortVersionString` = `1.0`, `LSRequiresNativeExecution` =
+      `true` (added post-approval — see implementation-notes.md — to force
+      native/arm64 execution and prevent macOS defaulting the bundle to
+      Rosetta). No `CFBundleIconFile`, `LSUIElement`, or
+      `LSBackgroundOnly` keys.
+- [x] `Contents/MacOS/launch` — rewrite the POSIX shell script exactly as
+      specified in design.md § `Contents/MacOS/launch` (previous version
+      used `POTA_LAUNCHER_PROJECT_DIR`/a hardcoded default path — replace
+      it entirely): resolves `SCRIPT_DIR` from `$0`'s own directory
+      (`cd "$(dirname "$0")" && pwd`), then `PROJECT_DIR` by walking up
+      four levels from `SCRIPT_DIR` (`Contents/MacOS` → `Contents` →
+      `POTA QSO Logging.app` → `macos` → project root); alerts via
+      `osascript` and exits `1` if `$PROJECT_DIR/.venv/bin/python` is not
+      executable; creates `~/POTA Logs` if missing; `cd`s into it; runs
+      the app via `arch -"$NATIVE_ARCH"` (added post-approval — see
+      implementation-notes.md — to force the true native architecture via
+      `sysctl -n hw.optional.arm64` regardless of the Rosetta/native state
+      the script itself was launched under) with output redirected to
       `~/POTA Logs/launcher.log`; alerts via `osascript` naming the exit
       code and log path if the app exits non-zero; exits with that same
-      code). Set the executable bit (`chmod +x`) so it is a valid
+      code. Set the executable bit (`chmod +x`) so it is a valid
       `CFBundleExecutable`.
 
 ## Tests
 
 `tests/macos/` mirrors `macos/` (per `.claude/rules/structure.md`).
 
-- [x] `tests/macos/test_launch.py` — implement, against
-      `macos/POTA QSO Logging.app/Contents/MacOS/launch` via
-      `subprocess`, all four cases from design.md § Testing Strategy:
-      - `test_shows_alert_and_exits_nonzero_when_venv_missing`:
-        `POTA_LAUNCHER_PROJECT_DIR` points at an empty temp dir; a stub
-        `osascript` prepended to `PATH` records its invocation; assert
-        `launch` exits non-zero, the stub was invoked, and
-        `~/POTA Logs` (temp `HOME`) was not created.
+- [x] `tests/macos/test_launch.py` — rewrite against the new
+      location-relative `launch`, per design.md § Testing Strategy. Add a
+      shared fixture/helper that builds a throwaway "fake clone" temp
+      directory tree reproducing the real bundle layout —
+      `<fake-clone>/macos/POTA QSO Logging.app/Contents/MacOS/launch`
+      (copied from the real script) plus `<fake-clone>/.venv/bin/python`
+      — since `POTA_LAUNCHER_PROJECT_DIR` no longer exists for tests to
+      point at. All five cases:
+      - `test_resolves_project_dir_from_bundle_location_regardless_of_where_the_clone_lives`
+        (new): build two fake clones in unrelated temp directories, each
+        with its own stub `.venv/bin/python` recording cwd/argv; run
+        `launch` from each; assert each run's stub recorded that fake
+        clone's own paths, proving `PROJECT_DIR` resolution follows the
+        bundle's location rather than any fixed path.
+      - `test_shows_alert_and_exits_nonzero_when_venv_missing`: fake
+        clone with no `.venv` at all; a stub `osascript` prepended to
+        `PATH` records its invocation; assert `launch` exits non-zero,
+        the stub was invoked, and `~/POTA Logs` (temp `HOME`) was not
+        created.
       - `test_creates_logs_dir_and_runs_python_with_expected_argv_and_cwd`:
-        `POTA_LAUNCHER_PROJECT_DIR` points at a temp dir with a stub
-        `.venv/bin/python` that records its cwd and argv to a file and
-        exits `0`; assert `~/POTA Logs` (temp `HOME`) was created, the
-        recorded cwd is that directory, the recorded argv is `-m
+        fake clone with a stub `.venv/bin/python` that records its cwd
+        and argv to a file and exits `0`; run `launch` with `HOME` set to
+        another temp dir; assert `~/POTA Logs` (temp `HOME`) was created,
+        the recorded cwd is that directory, the recorded argv is `-m
         radio_pota_logging.api.composition_root`, `launch` exits `0`, and
         the `osascript` stub was not invoked.
       - `test_does_not_touch_existing_logs_directory_contents`: same

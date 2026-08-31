@@ -15,6 +15,7 @@ from radio_pota_logging.domain.logging_session.value_objects import (
     Qso,
     QsoTimestamp,
     SessionId,
+    SessionStart,
 )
 
 _SESSION_FILENAME = ".qso_session.json"
@@ -53,6 +54,20 @@ def _qso_timestamp_from_dict(data: dict[str, Any]) -> QsoTimestamp:
     return QsoTimestamp(
         qso_date=date.fromisoformat(data["qso_date"]),
         time_on=time.fromisoformat(data["time_on"]),
+    )
+
+
+def _session_start_to_dict(session_start: SessionStart) -> dict[str, str]:
+    return {
+        "qso_date": session_start.qso_date.isoformat(),
+        "my_sig_info": session_start.my_sig_info,
+    }
+
+
+def _session_start_from_dict(data: dict[str, Any]) -> SessionStart:
+    return SessionStart(
+        qso_date=date.fromisoformat(data["qso_date"]),
+        my_sig_info=data["my_sig_info"],
     )
 
 
@@ -121,6 +136,7 @@ def _session_to_dict(session: LoggingSession) -> dict[str, Any]:
         "session_id": str(session.session_id.value),
         "qsos": [_qso_to_dict(qso) for qso in session.qsos],
         "next_entry_defaults": _entry_defaults_to_dict(session.next_entry_defaults),
+        "session_start": _session_start_to_dict(session.session_start),
     }
 
 
@@ -129,4 +145,5 @@ def _session_from_dict(data: dict[str, Any]) -> LoggingSession:
         session_id=SessionId(uuid.UUID(data["session_id"])),
         qsos=tuple(_qso_from_dict(qso) for qso in data["qsos"]),
         next_entry_defaults=_entry_defaults_from_dict(data["next_entry_defaults"]),
+        session_start=_session_start_from_dict(data["session_start"]),
     )

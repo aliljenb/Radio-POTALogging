@@ -70,8 +70,19 @@ class FakeGenerateAdifCommand:
         self.executed_with = destination
 
 
+class FakeSuggestAdifFilenameQuery:
+    def __init__(self, suggestion: str = "20260830-K-1234.adi") -> None:
+        self._suggestion = suggestion
+
+    def execute(self) -> str:
+        return self._suggestion
+
+
 def _make_controller(
-    qtbot: QtBot, submit_command: object, generate_adif_command: object
+    qtbot: QtBot,
+    submit_command: object,
+    generate_adif_command: object,
+    suggest_adif_filename_command: object | None = None,
 ) -> tuple[QsoEntryController, QsoEntryFormWidget, QsoListWidget]:
     form = QsoEntryFormWidget()
     qso_list = QsoListWidget()
@@ -83,6 +94,8 @@ def _make_controller(
         qso_list=qso_list,
         submit_command=submit_command,  # type: ignore[arg-type]
         generate_adif_command=generate_adif_command,  # type: ignore[arg-type]
+        suggest_adif_filename_command=suggest_adif_filename_command  # type: ignore[arg-type]
+        or FakeSuggestAdifFilenameQuery(),
         dialog_parent=form,
     )
     return controller, form, qso_list
@@ -156,6 +169,28 @@ def test_generate_adif_invokes_command_with_chosen_destination(
     controller.generate_adif()
 
     assert generate_adif_command.executed_with == destination
+
+
+def test_generate_adif_passes_suggested_filename_as_save_dialog_default(
+    qtbot: QtBot, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    captured_args: list[object] = []
+
+    def fake_get_save_file_name(*args: object, **_kwargs: object) -> tuple[str, str]:
+        captured_args.extend(args)
+        return str(tmp_path / "out.adi"), ""
+
+    monkeypatch.setattr(
+        controller_module.QFileDialog, "getSaveFileName", classmethod(fake_get_save_file_name)
+    )
+    suggest_command = FakeSuggestAdifFilenameQuery("20260830-K-1234.adi")
+    controller, _, _ = _make_controller(
+        qtbot, FakeSubmitQsoCommand(), FakeGenerateAdifCommand(), suggest_command
+    )
+
+    controller.generate_adif()
+
+    assert "20260830-K-1234.adi" in captured_args
 
 
 def test_generate_adif_does_nothing_when_dialog_is_cancelled(

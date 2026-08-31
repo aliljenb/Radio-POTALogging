@@ -13,7 +13,10 @@ from radio_pota_logging.application.logging_session.commands import (
     StartNewSessionCommand,
     SubmitQsoCommand,
 )
-from radio_pota_logging.application.logging_session.queries import CheckForResumableSessionQuery
+from radio_pota_logging.application.logging_session.queries import (
+    CheckForResumableSessionQuery,
+    SuggestAdifFilenameQuery,
+)
 from radio_pota_logging.infrastructure.adif.adif_file_exporter import AdifFileExporter
 from radio_pota_logging.infrastructure.repositories.file_logging_session_repository import (
     FileLoggingSessionRepository,
@@ -41,6 +44,7 @@ def main() -> int:
         initial_result=initial_result,
         submit_qso=SubmitQsoCommand(repository),
         generate_adif=GenerateAdifCommand(repository, exporter),
+        suggest_adif_filename=SuggestAdifFilenameQuery(repository),
     )
     window.show()
     return app.exec()
