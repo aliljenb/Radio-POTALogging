@@ -8,7 +8,9 @@
 
 _Stories 13 and 14 approved 2026-08-31; Stories 1-12 remain previously
 approved and unchanged in substance except for the small cross-reference
-edits to Story 1, Story 2, and Story 9 noted above._
+edits to Story 1, Story 2, and Story 9 noted above. Story 15 (alternating
+QSO table row color) approved 2026-09-01. Story 16 (fixed, reduced QSO
+table column set) approved 2026-09-01._
 
 ## Introduction
 
@@ -367,6 +369,47 @@ between entries, and triggering that ADIF export on demand.
       example `<TIME_ON:6>141200`), for every QSO in the file regardless
       of when it was submitted.
 
+### Story 15: QSO table alternates row background color for readability
+
+> As an **operator**, I want **the submitted-QSO table to alternate its row
+> background color**, so that **I can visually track a row across many
+> columns and quickly find the QSO I'm looking for in a long session**.
+
+**Acceptance criteria:**
+
+- [ ] THE SYSTEM SHALL render the submitted-QSO table (`QsoListWidget`) with
+      alternating row background colors, using the system/OS palette's
+      alternate-row color rather than a fixed, hardcoded color.
+- [ ] THE SYSTEM SHALL apply the alternating colors regardless of how many
+      QSOs are in the table, including as new rows are appended (Story 2).
+- [ ] THE SYSTEM SHALL NOT otherwise change the table's columns, row order,
+      read-only behavior, or any other visual styling — this story only
+      affects row background color.
+
+### Story 16: QSO table shows only a fixed, reduced set of columns
+
+> As an **operator**, I want **the submitted-QSO table to show only the
+> columns I actually glance at while logging**, so that **I can see more
+> rows at once and scan a session's contacts without unrelated columns
+> crowding the screen**.
+
+**Acceptance criteria:**
+
+- [ ] THE SYSTEM SHALL render the submitted-QSO table (`QsoListWidget`)
+      with exactly 7 columns, in this left-to-right order: CALL,
+      QSO_DATE, TIME_ON, RST_RCVD, RST_SENT, FREQ, MODE.
+- [ ] THE SYSTEM SHALL NOT display TIME_OFF, BAND, OPERATOR, MY_SIG,
+      MY_SIG_INFO, MY_RIG, or TX_PWR as columns in the table, even though
+      these fields are still stored for every QSO and still written to
+      the generated ADIF file (adif-generation Story 1) unchanged.
+- [ ] THE SYSTEM SHALL apply this fixed column set and order to every row
+      in the table, including rows added after the table is first shown
+      (Story 2).
+- [ ] THE SYSTEM SHALL NOT otherwise change the table's read-only
+      behavior, row order, or alternating row background color (Story
+      15) — this story only affects which columns are shown and in what
+      order.
+
 ## Out of scope
 
 - Editing or deleting a QSO after it has been submitted and added to the
@@ -398,6 +441,14 @@ between entries, and triggering that ADIF export on demand.
 - Any RST_SENT/RST_RCVD default value other than "599" (CW) or "59"
   (SSB) — no other mode or custom-default mapping is supported (Story
   13).
+- Fixed, hardcoded alternating-row colors that ignore the OS/theme
+  palette, or any user-configurable color choice — the table always
+  follows the system palette's alternate-row color (Story 15).
+- Any user-configurable column set, order, width, or visibility toggle
+  for the QSO table — the 7-column set and order are fixed (Story 16).
+- Removing TIME_OFF, BAND, OPERATOR, MY_SIG, MY_SIG_INFO, MY_RIG, or
+  TX_PWR from what is stored per QSO or from the generated ADIF file —
+  Story 16 only hides them from the table display.
 
 ## Open questions
 

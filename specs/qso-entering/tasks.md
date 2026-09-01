@@ -6,6 +6,10 @@
 - [x] In Review
 - [x] Approved
 
+_Prior tasks (through Story 15) remain previously approved and
+implemented. The two Story 16 tasks (fixed, reduced QSO table column set)
+approved 2026-09-01._
+
 ## How to use this file
 
 Each task must name the exact file(s) and function/class/method it creates
@@ -397,6 +401,19 @@ Frontend Design section; this project has no `frontend/src`)
       constructing `self._time_on = QTimeEdit()`, hiding the seconds
       spinner section per design.md § Overview (Story 14 amendment) and §
       Components.
+- [x] `qso_list_widget.py` — **modify** `QsoListWidget.__init__`: call
+      `self.setAlternatingRowColors(True)` right after the existing
+      `self.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)` call
+      per design.md § Overview (Story 15 amendment) and § Components.
+- [x] `qso_list_widget.py` — **modify**: change the module-level
+      `_COLUMNS` tuple to exactly `("CALL", "QSO_DATE", "TIME_ON",
+      "RST_RCVD", "RST_SENT", "FREQ", "MODE")`, and change
+      `append_qso()`'s local `values` tuple to `(qso.call,
+      qso.qso_date.isoformat(), qso.time_on.isoformat(), qso.rst_rcvd,
+      qso.rst_sent, qso.freq, qso.mode)` — both edits land together, since
+      `values`' length must match `len(_COLUMNS)` for the `enumerate(values)`
+      loop's column-aligned `setItem(...)` calls per design.md § Overview
+      (Story 16 amendment) and § Components.
 
 ## Frontend
 
@@ -711,6 +728,18 @@ N/A — this project has no `frontend/src`; see design.md § API Layer.
 - [x] `tests/api/test_session_setup_dialog.py` — **add** a pytest-qt test
       (Story 14): `dialog._time_on.displayFormat() == "HH:mm"` per
       design.md § Testing Strategy.
+- [x] `tests/api/test_qso_list_widget.py` — **add** a pytest-qt test (Story
+      15): construct `QsoListWidget` and assert
+      `.alternatingRowColors() is True` per design.md § Testing Strategy.
+- [x] `tests/api/test_qso_list_widget.py` — **modify**
+      `test_append_qso_adds_rows_in_order`: update its column-index
+      assertions to the new 7-column layout (CALL is column 0, BAND is no
+      longer a column), and **add** assertions that
+      `widget.columnCount() == 7` and the horizontal header labels, read
+      via `widget.horizontalHeaderItem(i).text()` for `i in range(7)`,
+      equal `["CALL", "QSO_DATE", "TIME_ON", "RST_RCVD", "RST_SENT",
+      "FREQ", "MODE"]` per design.md § Testing Strategy (Story 16
+      amendment).
 
 ## Task Dependencies
 
@@ -939,3 +968,22 @@ N/A — this project has no `frontend/src`; see design.md § API Layer.
   display-format test.
 - Independent of the Story 13 tasks above — may be done in any order
   relative to them.
+
+### Story 15 amendment (added after Story 14 was implemented)
+
+- `qso_list_widget.py`'s `setAlternatingRowColors(True)` addition has no
+  dependency on anything new and must land before its own new
+  `test_qso_list_widget.py` test case.
+- Independent of every other amendment in this file — touches only
+  `qso_list_widget.py`.
+
+### Story 16 amendment (added after Story 15 was implemented)
+
+- `qso_list_widget.py`'s `_COLUMNS`/`append_qso()` column-set modification
+  depends on Story 15's `setAlternatingRowColors(True)` addition already
+  being landed in the same file (both edit `qso_list_widget.py`, but are
+  otherwise unrelated — the column change doesn't touch the
+  `setAlternatingRowColors` line) and must land before its own modified
+  `test_qso_list_widget.py` test.
+- Otherwise independent of every other amendment in this file — touches
+  only `qso_list_widget.py`.
