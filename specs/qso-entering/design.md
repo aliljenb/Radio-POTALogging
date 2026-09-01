@@ -6,6 +6,10 @@
 - [x] In Review
 - [x] Approved
 
+_Prior content (through Story 15) remains previously approved and
+unchanged. Story 16 amendment (fixed, reduced QSO table column set)
+approved 2026-09-01._
+
 ## Overview
 
 A single-operator PyQt desktop application built around one aggregate,
@@ -333,6 +337,50 @@ constructed with, and `QsoTimestamp.__post_init__` normalizes it to zero
 regardless, so touching that read isn't necessary for correctness; it's
 left as-is to keep this a minimal, single-purpose change.
 
+**Amendment (Story 15, added after Story 14 was implemented)**: the
+submitted-QSO table (`QsoListWidget`, a `QTableWidget`) alternates its row
+background color. This is UI-only — no domain/application/infrastructure
+change. `QsoListWidget.__init__` gains one call,
+`self.setAlternatingRowColors(True)`, right after the existing
+`setEditTriggers(...)` call. `QAbstractItemView.setAlternatingRowColors`
+(inherited by `QTableWidget`) pulls the alternate-row color from the
+active `QPalette`'s `QPalette.ColorRole.AlternateBase` role, which Qt
+derives from the OS/theme palette — so no fixed color is hardcoded
+anywhere, satisfying the "system palette, not a fixed color" choice made
+during requirements. `append_qso()` needs no change: alternating coloring
+is a rendering behavior of the view itself, automatically reapplied as
+rows are inserted, not a per-row property that has to be set.
+
+**Amendment (Story 16, added after Story 15 was implemented)**: the
+submitted-QSO table shows only 7 of its current 14 columns, in a fixed
+order: CALL, QSO_DATE, TIME_ON, RST_RCVD, RST_SENT, FREQ, MODE. This is
+UI-only — no domain/application/infrastructure change; `QsoDto` keeps all
+14 fields (every one is still needed for `AdifFileExporter`), and
+`append_qso()`'s caller still passes a full `QsoDto`. Two changes,
+confined entirely to `qso_list_widget.py`:
+
+1. The module-level `_COLUMNS` tuple changes from its current 14-entry
+   sequence to exactly `("CALL", "QSO_DATE", "TIME_ON", "RST_RCVD",
+   "RST_SENT", "FREQ", "MODE")` — this single tuple already drives both
+   `setHorizontalHeaderLabels(_COLUMNS)` and, indirectly, the table's
+   column count (`super().__init__(0, len(_COLUMNS), parent)`), so
+   shrinking it to 7 entries changes the header and column count
+   together, with nothing else to touch for that part.
+2. `append_qso()`'s local `values` tuple changes from its current
+   14-value sequence (one per `QsoDto` field, in the old column order) to
+   `(qso.call, qso.qso_date.isoformat(), qso.time_on.isoformat(),
+   qso.rst_rcvd, qso.rst_sent, qso.freq, qso.mode)` — the same seven
+   `QsoDto` attributes already read today, reordered and reduced to match
+   the new `_COLUMNS`, dropping `qso.time_off`, `qso.band`, `qso.my_sig`,
+   `qso.my_sig_info`, `qso.operator`, `qso.my_rig`, and `qso.tx_pwr` from
+   what gets written into table cells (not from `QsoDto` itself, which is
+   unchanged).
+
+Because `values`' length must always match `len(_COLUMNS)` for the
+`enumerate(values)` loop's `setItem(row, column, ...)` calls to stay
+column-aligned, these two changes land together as one edit, not two
+independent ones.
+
 ## Domain Model
 
 > Pure business logic. Zero framework/infra imports. Lives under
@@ -519,7 +567,7 @@ satisfying "without discarding the previous session's persisted file."
 | `session_bootstrap.bootstrap_session()` | Run the startup sequence (resume prompt if applicable, then either resume or the setup dialog + `StartNewSessionCommand`) and decide whether the app should proceed at all | `CheckForResumableSessionQuery`, `ResumeSessionCommand`, `StartNewSessionCommand`; shows `SessionResumePromptDialog`/`SessionSetupDialog` |
 | `uppercase_field.uppercase_as_typed(line_edit)` | Make one `QLineEdit` uppercase its text live as the operator types, preserving cursor position (Story 5/7) | none (pure Qt helper; called once per field during widget `__init__`) |
 | `QsoEntryFormWidget` | Render the 11 entry fields in 3 columns — column 1: CALL, RST_RCVD, RST_SENT, TIME_ON; column 2: FREQ, MY_SIG_INFO, QSO_DATE, MODE; column 3: OPERATOR, MY_RIG, TX_PWR (Story 12) — and emit the submitted values; apply a new `EntryDefaultsDto` to pre-fill itself and focus CALL; uppercase CALL, MY_SIG_INFO, and OPERATOR live as the operator types, via `uppercase_as_typed()` (requirements Story 5, 7, 8); render MODE as a non-editable `QComboBox` populated from `MODE_OPTIONS`, defaulting to "CW" (Story 9); update RST_SENT/RST_RCVD to the new MODE's default when MODE changes, for each field not already edited away from its previous default (Story 13); submit on Enter/Return from any field when CALL is non-empty, via an `eventFilter` installed on all 11 fields (Story 11); its TIME_ON `QTimeEdit` uses `setDisplayFormat("HH:mm")`, hiding seconds entry (Story 14); Tab through the 11 fields column-major, in the same fixed order as their pre-column-layout sequence, via an explicit `setTabOrder()` chain (Story 12) | emits `SubmitQsoRequest` via a Qt signal |
-| `QsoListWidget` | Display submitted QSOs, in order, read-only | renders `QsoDto` rows appended to it |
+| `QsoListWidget` | Display submitted QSOs, in order, read-only, with alternating row background colors from the system palette (Story 15), showing only the 7 columns CALL, QSO_DATE, TIME_ON, RST_RCVD, RST_SENT, FREQ, MODE (Story 16) | renders `QsoDto` rows appended to it |
 | `QsoEntryController` | Wire widget signals to application commands/queries and route results/errors back to the widgets | `SubmitQsoCommand`, `GenerateAdifCommand` |
 | `composition_root.py` (`main`) | Construct the concrete adapters, run `bootstrap_session()`, and — only if it returns a result rather than `None` — construct/show `MainWindow` and run the Qt event loop | — |
 
@@ -713,8 +761,36 @@ Mirrors `src/` under `tests/`.
   `displayFormat()` equals `"HH:mm"` (no seconds section); submitting the
   form and reading the emitted `SubmitQsoRequest.time_on` back always has
   `.second == 0`, regardless of what the underlying `QTime` reports.
+  Story 15: constructing `QsoListWidget` and reading
+  `.alternatingRowColors()` back is `True` — a direct check that the
+  system-palette-driven behavior is enabled, not a pixel-color comparison
+  (which would be theme-dependent and non-deterministic in CI). Story 16:
+  `widget.columnCount() == 7`; reading the horizontal header's label text
+  for each column index equals `["CALL", "QSO_DATE", "TIME_ON",
+  "RST_RCVD", "RST_SENT", "FREQ", "MODE"]`, in order; appending a `QsoDto`
+  and reading back the 7 cell values in column order matches the source
+  `QsoDto`'s `call, qso_date, time_on, rst_rcvd, rst_sent, freq, mode`
+  fields — the existing `test_append_qso_adds_rows_in_order` test's
+  column-index assertions (written against the old 14-column layout) are
+  **modified** to the new column indices rather than left to silently
+  assert against the wrong columns.
 
 ## Open Questions / Risks
+
+None currently outstanding for Story 16. It's a data-shape edit confined
+to one file: shrink/reorder `_COLUMNS` and shrink/reorder the matching
+`values` tuple in `append_qso()` — `QsoDto` and every other layer are
+untouched since the 7 dropped fields are still needed for ADIF export and
+nothing else reads them off the table. The existing
+`test_append_qso_adds_rows_in_order` test needs its column-index
+assertions updated to match, which is called out explicitly in Testing
+Strategy above so it isn't missed as a "hidden" regression.
+
+None currently outstanding for Story 15. It has exactly one reasonable
+shape: `QAbstractItemView.setAlternatingRowColors(True)` is the built-in
+Qt mechanism for exactly this behavior, already palette-driven (not a
+fixed color) with zero extra code — there is no real alternative design
+to weigh.
 
 None currently outstanding for Story 13 or Story 14. Story 13 is a
 mechanical generalization of the already-implemented Story 2 RST reset:
