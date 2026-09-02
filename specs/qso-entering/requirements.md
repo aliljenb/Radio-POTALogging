@@ -12,6 +12,13 @@ edits to Story 1, Story 2, and Story 9 noted above. Story 15 (alternating
 QSO table row color) approved 2026-09-01. Story 16 (fixed, reduced QSO
 table column set) approved 2026-09-01._
 
+_Story 6 approved 2026-09-02: the session-setup ("New Session") dialog
+grows from 4 fields to 8, adding OPERATOR, MY_RIG, TX_PWR, and MODE so
+every Story 1 first-entry default now comes from the dialog instead of
+partly from application constants; small cross-reference edits follow in
+Story 1, Story 8, and Story 9. Ready for a `/spec-design qso-entering`
+follow-up pass._
+
 ## Introduction
 
 After a portable "Parks On The Air" (POTA) activation, an operator needs to
@@ -36,13 +43,16 @@ between entries, and triggering that ADIF export on demand.
       new session, THE SYSTEM SHALL display the fields CALL, QSO_DATE,
       TIME_ON, MODE, MY_SIG_INFO, RST_SENT, RST_RCVD, FREQ, OPERATOR,
       MY_RIG, and TX_PWR.
-- [ ] WHEN the form is first displayed, THE SYSTEM SHALL pre-fill OPERATOR
-      with "SM6Y", MODE with "CW", RST_SENT and RST_RCVD with the
-      MODE-dependent default for "CW" (Story 13), MY_RIG with "Elecraft
-      KX2", and TX_PWR with "5", from application constants.
 - [ ] WHEN the form is first displayed for a new session, THE SYSTEM SHALL
-      pre-fill QSO_DATE, TIME_ON, MY_SIG_INFO, and FREQ from the values
-      the operator entered in the session-setup dialog (Story 6).
+      pre-fill QSO_DATE, TIME_ON, MY_SIG_INFO, FREQ, OPERATOR, MY_RIG,
+      TX_PWR, and MODE from the values the operator entered in the
+      session-setup dialog (Story 6) — application constants ("SM6Y" for
+      OPERATOR, "CW" for MODE, "Elecraft KX2" for MY_RIG, "5" for TX_PWR)
+      no longer feed the entry form directly; they only seed the
+      session-setup dialog's own defaults (Story 6).
+- [ ] WHEN the form is first displayed, THE SYSTEM SHALL pre-fill RST_SENT
+      and RST_RCVD with the MODE-dependent default (Story 13) for the MODE
+      value carried from the session-setup dialog.
 - [ ] THE SYSTEM SHALL always associate MY_SIG with the fixed value "POTA"
       for every QSO, whether or not MY_SIG is shown as an editable field.
 - [ ] THE SYSTEM SHALL allow every pre-filled field to be edited by the
@@ -137,13 +147,14 @@ between entries, and triggering that ADIF export on demand.
       Story 1's "no format or callsign-lookup validation" criterion — this
       story only affects letter case, not what characters are accepted.
 
-### Story 6: Confirm park, date, start time, and frequency before a clean session begins
+### Story 6: Confirm all first-entry defaults before a clean session begins
 
 > As an **operator**, I want to **enter the POTA park reference, date,
-> time, and frequency of my first QSO before I start logging**, so that
-> **every QSO in this session is tagged with the right park, timestamps,
-> and band from the very first entry, without relying solely on the
-> computer's clock or retyping the frequency**.
+> time, frequency, operator, rig, power, and mode of my first QSO before I
+> start logging**, so that **every QSO in this session is tagged with the
+> right park, timestamps, band, and station setup from the very first
+> entry, without relying solely on the computer's clock or retyping
+> values that rarely change between activations**.
 
 **Acceptance criteria:**
 
@@ -151,18 +162,34 @@ between entries, and triggering that ADIF export on demand.
       application's first-ever launch (no previous session file found) or
       the operator chose to start clean after being asked to resume
       (Story 3) — THE SYSTEM SHALL show a modal dialog, before the QSO
-      entry form, with four fields: "POTA park reference number", "Date",
-      "Time of first QSO", and "Frequency".
-- [ ] THE SYSTEM SHALL pre-fill "Date" with the current date and "Time of
-      first QSO" with the current time (UTC), both editable; THE SYSTEM
-      SHALL leave "POTA park reference number" and "Frequency" empty.
+      entry form, with eight fields: "POTA park reference number", "Date",
+      "Time of first QSO", "Frequency", "Operator", "Rig", "TX Power", and
+      "Mode".
+- [ ] THE SYSTEM SHALL pre-fill "Date" with the current date, "Time of
+      first QSO" with the current time in UTC to whole-minute precision
+      (Story 14), "Frequency" with "14.060", "Operator" with "SM6Y",
+      "Rig" with "Elecraft KX2", "TX Power" with "5", and "Mode" with
+      "CW" — all editable; THE SYSTEM SHALL leave "POTA park reference
+      number" empty.
+- [ ] THE SYSTEM SHALL render "Mode" as a dropdown list offering exactly
+      "CW" and "SSB", not a free-text field, with the same restrictions
+      and behavior as the MODE dropdown on the main QSO entry form (Story
+      9).
+- [ ] WHEN the operator types into "Operator", THE SYSTEM SHALL display
+      any letters as uppercase, regardless of the physical keyboard's
+      case/layout state, the same as the main QSO entry form's OPERATOR
+      field (Story 8) and the same as this dialog's existing "POTA park
+      reference number" behavior (Story 7).
 - [ ] THE SYSTEM SHALL provide "OK" and "Quit" actions on the dialog.
 - [ ] THE SYSTEM SHALL NOT allow "OK" to proceed while "POTA park
-      reference number" or "Frequency" is empty.
-- [ ] WHEN the operator clicks "OK" with both a non-empty park reference
-      and a non-empty Frequency, THE SYSTEM SHALL close the dialog and use
-      "POTA park reference number" as MY_SIG_INFO, "Date" as QSO_DATE,
-      "Time of first QSO" as TIME_ON, and "Frequency" as FREQ for the new
+      reference number", "Frequency", "Operator", "Rig", or "TX Power" is
+      empty. ("Mode" cannot be empty, since it is a restricted dropdown.)
+- [ ] WHEN the operator clicks "OK" with all of "POTA park reference
+      number", "Frequency", "Operator", "Rig", and "TX Power" non-empty,
+      THE SYSTEM SHALL close the dialog and use "POTA park reference
+      number" as MY_SIG_INFO, "Date" as QSO_DATE, "Time of first QSO" as
+      TIME_ON, "Frequency" as FREQ, "Operator" as OPERATOR, "Rig" as
+      MY_RIG, "TX Power" as TX_PWR, and "Mode" as MODE for the new
       session's first entry form (Story 1).
 - [ ] WHEN the operator clicks "Quit", THE SYSTEM SHALL exit the
       application without creating a new session or showing the entry
@@ -172,6 +199,9 @@ between entries, and triggering that ADIF export on demand.
       only requires it to be non-empty. Those checks continue to happen
       only when the operator submits their first QSO, exactly as they
       already do for FREQ today.
+- [ ] THE SYSTEM SHALL NOT apply any format validation to "Rig" or "TX
+      Power" within the dialog beyond the non-empty requirement above —
+      the same "non-empty only" treatment Frequency already receives.
 
 ### Story 7: MY_SIG_INFO is always uppercase
 
@@ -215,6 +245,9 @@ between entries, and triggering that ADIF export on demand.
       display any letters as uppercase, regardless of the physical
       keyboard's case/layout state (e.g. Caps Lock off, a non-US layout)
       — the same behavior as CALL (Story 5).
+- [ ] WHEN the operator types into the session-setup dialog's "Operator"
+      field (Story 6), THE SYSTEM SHALL display any letters as uppercase
+      in the same way.
 - [ ] THE SYSTEM SHALL leave non-letter characters in OPERATOR unchanged.
 - [ ] WHEN a QSO is submitted, THE SYSTEM SHALL store OPERATOR with any
       letters as uppercase.
@@ -236,9 +269,14 @@ between entries, and triggering that ADIF export on demand.
 - [ ] THE SYSTEM SHALL render MODE as a dropdown list (not a free-text
       field) offering exactly two options: "CW" and "SSB".
 - [ ] WHEN the QSO entry form is first displayed for a new session, THE
-      SYSTEM SHALL default MODE to "CW".
+      SYSTEM SHALL default MODE to whatever "Mode" was set to in the
+      session-setup dialog (Story 6), which itself defaults to "CW".
+- [ ] THE SYSTEM SHALL render the session-setup dialog's "Mode" field
+      (Story 6) as the same CW/SSB dropdown, with the same restriction to
+      those two options.
 - [ ] THE SYSTEM SHALL NOT allow any value other than "CW" or "SSB" to be
-      entered into MODE.
+      entered into MODE, in either the entry form or the session-setup
+      dialog.
 - [ ] IF the operator changes MODE before submitting a QSO, THEN THE
       SYSTEM SHALL carry the new selection forward to the next entry
       form's MODE default, the same way other pre-filled fields are
@@ -429,6 +467,11 @@ between entries, and triggering that ADIF export on demand.
 - Remembering or suggesting a previously used park reference across
   sessions — the session-setup dialog's park reference field starts empty
   every time (Story 6).
+- Remembering or suggesting a previously used Operator, Rig, TX Power, or
+  Mode across sessions — the session-setup dialog's Operator, Rig, TX
+  Power, and Mode fields always start from the fixed application-constant
+  defaults ("SM6Y", "Elecraft KX2", "5", "CW"), never from what the
+  operator entered in a prior session (Story 6).
 - Validating the setup dialog's "Frequency" field as a decimal MHz value
   or checking it against the band-plan table — only non-empty is required
   there; the existing decimal-format/band-lookup checks (Story 1/4) still
@@ -452,6 +495,19 @@ between entries, and triggering that ADIF export on demand.
 
 ## Open questions
 
+- [ ] Story 6's field expansion (adding OPERATOR, MY_RIG, TX_PWR, and
+      MODE to the session-setup dialog, and the matching Story 1 change
+      to source all eight first-entry defaults from that dialog instead
+      of partly from application constants) is approved. It needs a
+      `/spec-design qso-entering` follow-up pass to decide: how
+      `SessionSetupDialog` (or equivalent) grows to 8 fields
+      and reuses the entry form's MODE `QComboBox` population and
+      OPERATOR uppercase-as-typed handler; and how `LoggingSession`'s
+      first-entry seeding (`EntryDefaults.seed` per the Story 13 open
+      question) changes to take OPERATOR/MY_RIG/TX_PWR/MODE from the
+      dialog's result instead of `StationDefaults` constants directly —
+      then `/spec-tasks qso-entering` before `/implement-task` can add
+      it.
 - [ ] The Story 2 RST_SENT/RST_RCVD change needs a follow-up pass through
       `/spec-design qso-entering` to decide exactly where the "always 599,
       never carried forward" rule is enforced — likely

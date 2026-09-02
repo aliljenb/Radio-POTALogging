@@ -80,3 +80,22 @@ The QSO table shall only show the following columns in that order:
 6. FREQ
 7. MODE
 ------------------------------
+## Change to Story 6
+The "New Session" window shall contain the following fields:
+MY_SIG_INFO (label "POTA park reference number", default empty)
+QSO_DATE (label "Date", default current date)
+TIME_ON (label "Time of first QSO", default current UTC time whole minutes)
+FREQ (label "Frequency", default "14.060")
+OPERATOR (label "Operator", default "SM6Y")
+MY_RIG (label "Rig", default "Elecraft KX2")
+TX_PWR (label "TX Power", default "5")
+MODE (label "Mode", default "CW"), dropdown list (with same behavior as on the main dialog)
+
+
+  | Column 1 | Column 2 | Column 3 |
+  |----------|----------|----------|
+  | CALL | FREQ | OPERATOR |
+  | RST_RCVD | MY_SIG_INFO | MY_RIG |
+  | RST_SENT | QSO_DATE | TX_PWR |
+  | TIME_ON | MODE | |
+------------------------------
