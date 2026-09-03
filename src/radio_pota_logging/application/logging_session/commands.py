@@ -21,7 +21,6 @@ from radio_pota_logging.domain.logging_session.value_objects import (
     EntryDefaults,
     Qso,
     QsoTimestamp,
-    StationDefaults,
 )
 
 from .dto import (
@@ -94,15 +93,27 @@ class StartNewSessionCommand:
     repository: LoggingSessionRepository
 
     def execute(
-        self, *, qso_date: date, time_on: time, park_reference: str, freq: str
+        self,
+        *,
+        qso_date: date,
+        time_on: time,
+        park_reference: str,
+        freq: str,
+        operator: str,
+        mode: str,
+        my_rig: str,
+        tx_pwr: str,
     ) -> SessionStartResult:
         existing = self.repository.find_unfinished()
         if existing is not None:
             self.repository.archive(existing)
 
         session = LoggingSession.start(
-            StationDefaults(),
             QsoTimestamp(qso_date, time_on),
+            operator=operator,
+            mode=mode,
+            my_rig=my_rig,
+            tx_pwr=tx_pwr,
             my_sig_info=park_reference,
             freq=freq,
         )

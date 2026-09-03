@@ -38,4 +38,8 @@ def bootstrap_session(
         time_on=setup_dialog.setup_result.time_on,
         park_reference=setup_dialog.setup_result.park_reference,
         freq=setup_dialog.setup_result.freq,
+        operator=setup_dialog.setup_result.operator,
+        mode=setup_dialog.setup_result.mode,
+        my_rig=setup_dialog.setup_result.my_rig,
+        tx_pwr=setup_dialog.setup_result.tx_pwr,
     )

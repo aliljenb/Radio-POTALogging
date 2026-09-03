@@ -9,12 +9,18 @@ from radio_pota_logging.domain.logging_session.exceptions import (
 from radio_pota_logging.domain.logging_session.value_objects import (
     QsoTimestamp,
     SessionStart,
-    StationDefaults,
 )
 
 
-def _new_session() -> LoggingSession:
-    return LoggingSession.start(StationDefaults(), QsoTimestamp(date(2026, 8, 30), time(9, 0)))
+def _new_session(**overrides: object) -> LoggingSession:
+    fields: dict[str, object] = {
+        "operator": "SM6Y",
+        "mode": "CW",
+        "my_rig": "Elecraft KX2",
+        "tx_pwr": "5",
+    }
+    fields.update(overrides)
+    return LoggingSession.start(QsoTimestamp(date(2026, 8, 30), time(9, 0)), **fields)  # type: ignore[arg-type]
 
 
 def test_start_seeds_defaults_and_empty_qso_list() -> None:
@@ -25,17 +31,21 @@ def test_start_seeds_defaults_and_empty_qso_list() -> None:
 
 
 def test_start_seeds_my_sig_info_from_given_park_reference() -> None:
-    session = LoggingSession.start(
-        StationDefaults(), QsoTimestamp(date(2026, 8, 30), time(9, 0)), my_sig_info="K-1234"
-    )
+    session = _new_session(my_sig_info="K-1234")
     assert session.next_entry_defaults.my_sig_info == "K-1234"
 
 
 def test_start_seeds_freq_from_given_frequency() -> None:
-    session = LoggingSession.start(
-        StationDefaults(), QsoTimestamp(date(2026, 8, 30), time(9, 0)), freq="14.062"
-    )
+    session = _new_session(freq="14.062")
     assert session.next_entry_defaults.freq == "14.062"
+
+
+def test_start_seeds_operator_mode_my_rig_tx_pwr_from_given_values() -> None:
+    session = _new_session(operator="W1AW", mode="SSB", my_rig="FT-891", tx_pwr="10")
+    assert session.next_entry_defaults.operator == "W1AW"
+    assert session.next_entry_defaults.mode == "SSB"
+    assert session.next_entry_defaults.my_rig == "FT-891"
+    assert session.next_entry_defaults.tx_pwr == "10"
 
 
 def test_record_qso_sets_time_off_equal_to_time_on_and_fixed_my_sig() -> None:
@@ -204,9 +214,7 @@ def test_record_qso_rejects_unparsable_frequency_and_leaves_state_unchanged() ->
 
 
 def test_start_sets_session_start_from_qso_date_and_my_sig_info() -> None:
-    session = LoggingSession.start(
-        StationDefaults(), QsoTimestamp(date(2026, 8, 30), time(9, 0)), my_sig_info="k-1234"
-    )
+    session = _new_session(my_sig_info="k-1234")
     assert session.session_start == SessionStart(qso_date=date(2026, 8, 30), my_sig_info="K-1234")
 
 

@@ -4,10 +4,12 @@ from datetime import date, time
 from pathlib import Path
 
 from radio_pota_logging.domain.logging_session.entities import LoggingSession
-from radio_pota_logging.domain.logging_session.value_objects import QsoTimestamp, StationDefaults
+from radio_pota_logging.domain.logging_session.value_objects import QsoTimestamp
 from radio_pota_logging.infrastructure.repositories.file_logging_session_repository import (
     FileLoggingSessionRepository,
 )
+
+_STATION_KWARGS = {"operator": "SM6Y", "mode": "CW", "my_rig": "Elecraft KX2", "tx_pwr": "5"}
 
 
 def test_find_unfinished_returns_none_when_no_file(tmp_path: Path) -> None:
@@ -16,7 +18,7 @@ def test_find_unfinished_returns_none_when_no_file(tmp_path: Path) -> None:
 
 
 def test_save_then_find_unfinished_round_trips(tmp_path: Path) -> None:
-    session = LoggingSession.start(StationDefaults(), QsoTimestamp(date(2026, 8, 30), time(9, 0)))
+    session = LoggingSession.start(QsoTimestamp(date(2026, 8, 30), time(9, 0)), **_STATION_KWARGS)
     session.record_qso(
         call="W1AW",
         qso_date=date(2026, 8, 30),
@@ -46,7 +48,7 @@ def test_save_then_find_unfinished_round_trips(tmp_path: Path) -> None:
 
 def test_save_then_find_unfinished_preserves_session_start(tmp_path: Path) -> None:
     session = LoggingSession.start(
-        StationDefaults(), QsoTimestamp(date(2026, 8, 30), time(9, 0)), my_sig_info="k-1234"
+        QsoTimestamp(date(2026, 8, 30), time(9, 0)), my_sig_info="k-1234", **_STATION_KWARGS
     )
     repository = FileLoggingSessionRepository(tmp_path)
     repository.save(session)
@@ -59,7 +61,7 @@ def test_save_then_find_unfinished_preserves_session_start(tmp_path: Path) -> No
 
 
 def test_archive_renames_file_without_deleting_data(tmp_path: Path) -> None:
-    session = LoggingSession.start(StationDefaults(), QsoTimestamp(date(2026, 8, 30), time(9, 0)))
+    session = LoggingSession.start(QsoTimestamp(date(2026, 8, 30), time(9, 0)), **_STATION_KWARGS)
     repository = FileLoggingSessionRepository(tmp_path)
     repository.save(session)
 
@@ -235,7 +237,7 @@ def test_find_unfinished_normalizes_a_legacy_nonzero_seconds_time_on(tmp_path: P
 
 
 def test_archive_without_a_saved_session_is_a_no_op(tmp_path: Path) -> None:
-    session = LoggingSession.start(StationDefaults(), QsoTimestamp(date(2026, 8, 30), time(9, 0)))
+    session = LoggingSession.start(QsoTimestamp(date(2026, 8, 30), time(9, 0)), **_STATION_KWARGS)
     repository = FileLoggingSessionRepository(tmp_path)
 
     repository.archive(session)

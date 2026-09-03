@@ -9,13 +9,15 @@ from radio_pota_logging.application.logging_session.commands import (
     StartNewSessionCommand,
     SubmitQsoCommand,
 )
-from radio_pota_logging.application.logging_session.dto import SubmitQsoRequest
+from radio_pota_logging.application.logging_session.dto import (
+    SessionStartResult,
+    SubmitQsoRequest,
+)
 from radio_pota_logging.domain.logging_session.entities import LoggingSession
 from radio_pota_logging.domain.logging_session.exceptions import FrequencyOutOfBandError
 from radio_pota_logging.domain.logging_session.value_objects import (
     Qso,
     QsoTimestamp,
-    StationDefaults,
 )
 
 
@@ -64,11 +66,24 @@ def _submit_request(**overrides: object) -> SubmitQsoRequest:
     return SubmitQsoRequest(**fields)  # type: ignore[arg-type]
 
 
+def _start_new_session(repository: FakeRepository, **overrides: object) -> SessionStartResult:
+    fields: dict[str, object] = {
+        "qso_date": date(2026, 8, 30),
+        "time_on": time(9, 0),
+        "park_reference": "K-1234",
+        "freq": "14.062",
+        "operator": "SM6Y",
+        "mode": "CW",
+        "my_rig": "Elecraft KX2",
+        "tx_pwr": "5",
+    }
+    fields.update(overrides)
+    return StartNewSessionCommand(repository).execute(**fields)  # type: ignore[arg-type]
+
+
 def test_start_new_session_seeds_defaults_and_saves() -> None:
     repository = FakeRepository()
-    result = StartNewSessionCommand(repository).execute(
-        qso_date=date(2026, 8, 30), time_on=time(9, 0), park_reference="K-1234", freq="14.062"
-    )
+    result = _start_new_session(repository)
     assert result.entry_defaults.operator == "SM6Y"
     assert result.qsos == ()
     assert repository.session is not None
@@ -76,31 +91,48 @@ def test_start_new_session_seeds_defaults_and_saves() -> None:
 
 def test_start_new_session_seeds_my_sig_info_from_park_reference() -> None:
     repository = FakeRepository()
-    result = StartNewSessionCommand(repository).execute(
-        qso_date=date(2026, 8, 30), time_on=time(9, 0), park_reference="K-1234", freq="14.062"
-    )
+    result = _start_new_session(repository)
     assert result.entry_defaults.my_sig_info == "K-1234"
 
 
 def test_start_new_session_seeds_freq_from_given_frequency() -> None:
     repository = FakeRepository()
-    result = StartNewSessionCommand(repository).execute(
-        qso_date=date(2026, 8, 30), time_on=time(9, 0), park_reference="K-1234", freq="14.062"
-    )
+    result = _start_new_session(repository)
     assert result.entry_defaults.freq == "14.062"
 
 
-def test_start_new_session_archives_existing_unfinished_session() -> None:
-    existing = LoggingSession.start(StationDefaults(), QsoTimestamp(date(2026, 8, 29), time(9, 0)))
-    repository = FakeRepository(existing)
-    StartNewSessionCommand(repository).execute(
-        qso_date=date(2026, 8, 30), time_on=time(9, 0), park_reference="K-1234", freq="14.062"
+def test_start_new_session_seeds_operator_mode_my_rig_tx_pwr_from_given_values() -> None:
+    repository = FakeRepository()
+    result = _start_new_session(
+        repository, operator="W1AW", mode="SSB", my_rig="FT-891", tx_pwr="10"
     )
+    assert result.entry_defaults.operator == "W1AW"
+    assert result.entry_defaults.mode == "SSB"
+    assert result.entry_defaults.my_rig == "FT-891"
+    assert result.entry_defaults.tx_pwr == "10"
+
+
+def test_start_new_session_archives_existing_unfinished_session() -> None:
+    existing = LoggingSession.start(
+        QsoTimestamp(date(2026, 8, 29), time(9, 0)),
+        operator="SM6Y",
+        mode="CW",
+        my_rig="Elecraft KX2",
+        tx_pwr="5",
+    )
+    repository = FakeRepository(existing)
+    _start_new_session(repository)
     assert repository.archived == [existing]
 
 
 def test_resume_session_returns_existing_state() -> None:
-    session = LoggingSession.start(StationDefaults(), QsoTimestamp(date(2026, 8, 30), time(9, 0)))
+    session = LoggingSession.start(
+        QsoTimestamp(date(2026, 8, 30), time(9, 0)),
+        operator="SM6Y",
+        mode="CW",
+        my_rig="Elecraft KX2",
+        tx_pwr="5",
+    )
     session.record_qso(
         call="W1AW",
         qso_date=date(2026, 8, 30),
@@ -120,7 +152,13 @@ def test_resume_session_returns_existing_state() -> None:
 
 
 def test_submit_qso_saves_and_returns_next_defaults() -> None:
-    session = LoggingSession.start(StationDefaults(), QsoTimestamp(date(2026, 8, 30), time(9, 0)))
+    session = LoggingSession.start(
+        QsoTimestamp(date(2026, 8, 30), time(9, 0)),
+        operator="SM6Y",
+        mode="CW",
+        my_rig="Elecraft KX2",
+        tx_pwr="5",
+    )
     repository = FakeRepository(session)
     result = SubmitQsoCommand(repository).execute(_submit_request())
     assert result.submitted.call == "W1AW"
@@ -129,14 +167,26 @@ def test_submit_qso_saves_and_returns_next_defaults() -> None:
 
 
 def test_submit_qso_propagates_domain_validation_errors() -> None:
-    session = LoggingSession.start(StationDefaults(), QsoTimestamp(date(2026, 8, 30), time(9, 0)))
+    session = LoggingSession.start(
+        QsoTimestamp(date(2026, 8, 30), time(9, 0)),
+        operator="SM6Y",
+        mode="CW",
+        my_rig="Elecraft KX2",
+        tx_pwr="5",
+    )
     repository = FakeRepository(session)
     with pytest.raises(FrequencyOutOfBandError):
         SubmitQsoCommand(repository).execute(_submit_request(freq="5.000"))
 
 
 def test_generate_adif_writes_exported_text_and_counts_qsos(tmp_path: Path) -> None:
-    session = LoggingSession.start(StationDefaults(), QsoTimestamp(date(2026, 8, 30), time(9, 0)))
+    session = LoggingSession.start(
+        QsoTimestamp(date(2026, 8, 30), time(9, 0)),
+        operator="SM6Y",
+        mode="CW",
+        my_rig="Elecraft KX2",
+        tx_pwr="5",
+    )
     session.record_qso(
         call="W1AW",
         qso_date=date(2026, 8, 30),
