@@ -90,7 +90,9 @@ OPERATOR (label "Operator", default "SM6Y")
 MY_RIG (label "Rig", default "Elecraft KX2")
 TX_PWR (label "TX Power", default "5")
 MODE (label "Mode", default "CW"), dropdown list (with same behavior as on the main dialog)
+------------------------------
 
+Next: Which fields shall be RO?
 
   | Column 1 | Column 2 | Column 3 |
   |----------|----------|----------|
@@ -98,4 +100,4 @@ MODE (label "Mode", default "CW"), dropdown list (with same behavior as on the m
   | RST_RCVD | MY_SIG_INFO | MY_RIG |
   | RST_SENT | QSO_DATE | TX_PWR |
   | TIME_ON | MODE | |
-------------------------------
+
