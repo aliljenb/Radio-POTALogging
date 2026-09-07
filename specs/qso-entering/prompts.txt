@@ -91,13 +91,14 @@ MY_RIG (label "Rig", default "Elecraft KX2")
 TX_PWR (label "TX Power", default "5")
 MODE (label "Mode", default "CW"), dropdown list (with same behavior as on the main dialog)
 ------------------------------
+## Change to Story 12
+In the main dialog the following fields shall be shown.
+Fields with a * in front of them shall be read-only fields.
 
-Next: Which fields shall be RO?
-
-  | Column 1 | Column 2 | Column 3 |
-  |----------|----------|----------|
-  | CALL | FREQ | OPERATOR |
-  | RST_RCVD | MY_SIG_INFO | MY_RIG |
-  | RST_SENT | QSO_DATE | TX_PWR |
-  | TIME_ON | MODE | |
-
+  | Column 1 | Column 2    | Column 3      |
+  |----------|-------------|---------------|
+  | CALL     | FREQ        | * MY_SIG_INFO |
+  | RST_RCVD | MODE        | * QSO_DATE    |
+  | RST_SENT | TX_PWR      | * OPERATOR    |
+  | TIME_ON  |             | * MY_RIG      |
+------------------------------

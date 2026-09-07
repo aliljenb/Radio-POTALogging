@@ -72,26 +72,6 @@ def test_typing_lowercase_into_call_displays_uppercase(qtbot: QtBot) -> None:
     assert widget._call.text() == "W1AW/P"
 
 
-def test_typing_lowercase_into_my_sig_info_displays_uppercase(qtbot: QtBot) -> None:
-    widget = QsoEntryFormWidget()
-    qtbot.addWidget(widget)
-    widget.show()
-
-    qtbot.keyClicks(widget._my_sig_info, "k-1234")
-
-    assert widget._my_sig_info.text() == "K-1234"
-
-
-def test_typing_lowercase_into_operator_displays_uppercase(qtbot: QtBot) -> None:
-    widget = QsoEntryFormWidget()
-    qtbot.addWidget(widget)
-    widget.show()
-
-    qtbot.keyClicks(widget._operator, "sm6y")
-
-    assert widget._operator.text() == "SM6Y"
-
-
 def test_mode_combo_box_offers_exactly_cw_and_ssb_and_is_not_editable(qtbot: QtBot) -> None:
     widget = QsoEntryFormWidget()
     qtbot.addWidget(widget)
@@ -145,10 +125,10 @@ def test_enter_in_a_non_call_field_submits_when_call_is_non_empty(qtbot: QtBot) 
     widget.show()
     widget.apply_defaults(_defaults())
     widget._call.setText("W1AW")
-    widget._my_rig.setFocus()
+    widget._tx_pwr.setFocus()
 
     with qtbot.waitSignal(widget.submitted, timeout=1000) as blocker:
-        qtbot.keyClick(widget._my_rig, Qt.Key.Key_Return)
+        qtbot.keyClick(widget._tx_pwr, Qt.Key.Key_Return)
 
     request: SubmitQsoRequest = blocker.args[0]
     assert request.call == "W1AW"
@@ -194,8 +174,8 @@ def test_fields_are_displayed_in_the_fixed_column_order(qtbot: QtBot) -> None:
     qtbot.addWidget(widget)
 
     assert _row_labels(widget._column_1, 4) == ["CALL", "RST_RCVD", "RST_SENT", "TIME_ON"]
-    assert _row_labels(widget._column_2, 4) == ["FREQ", "MY_SIG_INFO", "QSO_DATE", "MODE"]
-    assert _row_labels(widget._column_3, 3) == ["OPERATOR", "MY_RIG", "TX_PWR"]
+    assert _row_labels(widget._column_2, 3) == ["FREQ", "MODE", "TX_PWR"]
+    assert _row_labels(widget._column_3, 4) == ["MY_SIG_INFO", "QSO_DATE", "OPERATOR", "MY_RIG"]
 
 
 def test_tab_order_follows_the_fixed_field_order(qtbot: QtBot) -> None:
@@ -208,11 +188,7 @@ def test_tab_order_follows_the_fixed_field_order(qtbot: QtBot) -> None:
         widget._rst_sent,
         widget._time_on,
         widget._freq,
-        widget._my_sig_info,
-        widget._qso_date,
         widget._mode,
-        widget._operator,
-        widget._my_rig,
         widget._tx_pwr,
     ]
 
@@ -227,6 +203,49 @@ def test_tab_order_follows_the_fixed_field_order(qtbot: QtBot) -> None:
             break
 
     assert visited == expected[1:]
+
+
+def test_read_only_fields_are_disabled_and_others_stay_enabled(qtbot: QtBot) -> None:
+    widget = QsoEntryFormWidget()
+    qtbot.addWidget(widget)
+
+    assert not widget._my_sig_info.isEnabled()
+    assert not widget._qso_date.isEnabled()
+    assert not widget._operator.isEnabled()
+    assert not widget._my_rig.isEnabled()
+    for field in widget._fields:
+        assert field.isEnabled()
+
+
+def test_apply_defaults_still_prefills_disabled_fields(qtbot: QtBot) -> None:
+    widget = QsoEntryFormWidget()
+    qtbot.addWidget(widget)
+
+    widget.apply_defaults(_defaults())
+
+    assert widget._my_sig_info.text() == "K-1234"
+    qso_date_value = widget._qso_date.date()
+    assert date(qso_date_value.year(), qso_date_value.month(), qso_date_value.day()) == date(
+        2026, 8, 30
+    )
+    assert widget._operator.text() == "SM6Y"
+    assert widget._my_rig.text() == "Elecraft KX2"
+
+
+def test_submit_includes_values_from_disabled_fields(qtbot: QtBot) -> None:
+    widget = QsoEntryFormWidget()
+    qtbot.addWidget(widget)
+    widget.apply_defaults(_defaults())
+    widget._call.setText("W1AW")
+    submit_button = widget.findChildren(QPushButton)[0]
+
+    with qtbot.waitSignal(widget.submitted, timeout=1000) as blocker:
+        qtbot.mouseClick(submit_button, Qt.MouseButton.LeftButton)
+
+    request: SubmitQsoRequest = blocker.args[0]
+    assert request.my_sig_info == "K-1234"
+    assert request.operator == "SM6Y"
+    assert request.my_rig == "Elecraft KX2"
 
 
 def test_mode_change_updates_rst_sent_and_rst_rcvd_to_the_new_mode_default(qtbot: QtBot) -> None:

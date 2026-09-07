@@ -48,14 +48,12 @@ class QsoEntryFormWidget(QWidget):
         self._time_on.setDisplayFormat("HH:mm")
         self._freq = QLineEdit()
         self._my_sig_info = QLineEdit()
-        uppercase_as_typed(self._my_sig_info)
         self._qso_date = QDateEdit()
         self._qso_date.setCalendarPopup(True)
         self._mode = QComboBox()
         self._mode.addItems(MODE_OPTIONS)
         self._mode.currentTextChanged.connect(self._on_mode_changed)
         self._operator = QLineEdit()
-        uppercase_as_typed(self._operator)
         self._my_rig = QLineEdit()
         self._tx_pwr = QLineEdit()
         self._error_label = QLabel()
@@ -70,14 +68,18 @@ class QsoEntryFormWidget(QWidget):
 
         self._column_2 = QFormLayout()
         self._column_2.addRow("FREQ", self._freq)
-        self._column_2.addRow("MY_SIG_INFO", self._my_sig_info)
-        self._column_2.addRow("QSO_DATE", self._qso_date)
         self._column_2.addRow("MODE", self._mode)
+        self._column_2.addRow("TX_PWR", self._tx_pwr)
 
         self._column_3 = QFormLayout()
+        self._column_3.addRow("MY_SIG_INFO", self._my_sig_info)
+        self._column_3.addRow("QSO_DATE", self._qso_date)
         self._column_3.addRow("OPERATOR", self._operator)
         self._column_3.addRow("MY_RIG", self._my_rig)
-        self._column_3.addRow("TX_PWR", self._tx_pwr)
+        self._my_sig_info.setEnabled(False)
+        self._qso_date.setEnabled(False)
+        self._operator.setEnabled(False)
+        self._my_rig.setEnabled(False)
 
         columns_layout = QHBoxLayout()
         columns_layout.addLayout(self._column_1)
@@ -99,11 +101,7 @@ class QsoEntryFormWidget(QWidget):
             self._rst_sent,
             self._time_on,
             self._freq,
-            self._my_sig_info,
-            self._qso_date,
             self._mode,
-            self._operator,
-            self._my_rig,
             self._tx_pwr,
         ]
         for field in self._fields:

@@ -17,6 +17,15 @@ OPERATOR/MODE/MY_RIG/TX_PWR from the dialog's result instead of
 Story 6 approval note and its matching "Open questions" entry — approved
 2026-09-03._
 
+_Story 12 changed again 2026-09-07 (requirements.md): the entry form's
+column layout is revised — MODE and TX_PWR move to column 2, MY_SIG_INFO
+and QSO_DATE move to column 3 alongside OPERATOR and MY_RIG — and all four
+column-3 fields (MY_SIG_INFO, QSO_DATE, OPERATOR, MY_RIG) become read-only,
+grayed-out, and skipped by Tab. Drafted and approved 2026-09-07 in response
+to requirements.md's matching "Open questions" entry — see the amendment
+under Overview below. Ready for a `/spec-tasks qso-entering` follow-up
+pass._
+
 ## Overview
 
 A single-operator PyQt desktop application built around one aggregate,
@@ -479,6 +488,91 @@ first-entry OPERATOR/MODE/MY_RIG/TX_PWR/FREQ values come from — the
 operator-confirmed dialog result instead of a locally-constructed
 `StationDefaults()` — not how any of them are validated or displayed.
 
+**Amendment (Story 12 read-only fields, added after the Story 6
+field-expansion amendment)**: the entry form's column layout changes again
+— column 2 becomes FREQ, MODE, TX_PWR; column 3 becomes MY_SIG_INFO,
+QSO_DATE, OPERATOR, MY_RIG (column 1 is unchanged: CALL, RST_RCVD,
+RST_SENT, TIME_ON) — and the four column-3 fields become read-only,
+grayed-out, and unreachable by Tab. This is a pure API-layer change,
+confined entirely to `QsoEntryFormWidget.__init__`, in the same spirit as
+the two earlier Story 12 amendments (reordering, then column grouping):
+
+1. **`addRow(...)` calls move between `self._column_2`/`self._column_3`.**
+   `self._my_sig_info` and `self._qso_date`'s `addRow(...)` calls move from
+   `self._column_2` to `self._column_3` (added first, ahead of the
+   existing `self._operator`/`self._my_rig` rows, matching the table
+   order above); `self._tx_pwr`'s `addRow(...)` call moves from
+   `self._column_3` to `self._column_2` (added after `self._mode`). No
+   widget is constructed differently — same four lines, different layout
+   each `addRow` targets, the same kind of change the column-grouping
+   amendment already made once.
+2. **The four fields are disabled, not just excluded from the Tab
+   chain.** Right after `self._column_3`'s `addRow(...)` calls,
+   `self._my_sig_info.setEnabled(False)`,
+   `self._qso_date.setEnabled(False)`, `self._operator.setEnabled(False)`,
+   and `self._my_rig.setEnabled(False)` are added. `QWidget.setEnabled(False)`
+   is the one Qt mechanism that satisfies all three requirements.md Story
+   12 criteria at once: it renders the platform's standard grayed-out
+   disabled style (no custom stylesheet needed), it rejects all
+   keyboard/mouse input including typed edits (so no separate
+   `QLineEdit.setReadOnly(True)`/`QAbstractSpinBox.setReadOnly(True)` call
+   is needed — `setEnabled(False)` is a superset), and Qt's focus-chain
+   traversal automatically skips a disabled widget, satisfying the
+   Tab-order criterion as a side effect rather than a separate mechanism.
+   A disabled widget still accepts programmatic updates —
+   `QLineEdit.setText(...)`/`QDateEdit.setDate(...)` work identically
+   whether the widget is enabled or not — so `apply_defaults()` needs
+   **no change at all**: it already calls
+   `self._my_sig_info.setText(...)`, `self._qso_date.setDate(...)`,
+   `self._operator.setText(...)`, and `self._my_rig.setText(...)`
+   unconditionally, and those calls keep working exactly as before,
+   including QSO_DATE's automatic midnight-rollover advance (Story 2) —
+   "read-only" only ever meant "not operator-editable," never "the system
+   stops updating it" (requirements Story 12's explicit criterion on this
+   point).
+3. **`self._fields` (the Tab-order/Enter-to-submit list) shrinks from 11
+   entries to the 7 still-editable ones**: `self._call`, `self._rst_rcvd`,
+   `self._rst_sent`, `self._time_on`, `self._freq`, `self._mode`,
+   `self._tx_pwr` — dropping `self._my_sig_info`, `self._qso_date`,
+   `self._operator`, `self._my_rig`. This list already drives both the
+   `installEventFilter(self)` loop (Story 11's Enter-to-submit) and the
+   `QWidget.setTabOrder(...)` chain (the original Story 12 amendment) — a
+   disabled widget can never receive a `QEvent.Type.KeyPress` in the first
+   place, so dropping the four from `installEventFilter` removes dead
+   registrations rather than changing behavior; dropping them from the
+   `setTabOrder(...)` chain is what makes the explicit chain read
+   `CALL → RST_RCVD → RST_SENT → TIME_ON → FREQ → MODE → TX_PWR`, matching
+   requirements Story 12's Tab-order criterion exactly. (`setEnabled(False)`
+   alone would already cause Qt to skip these four during focus traversal
+   even if they stayed in an 11-entry `setTabOrder(...)` chain — shrinking
+   the list is about keeping the code's stated Tab order honest and
+   minimal, the same reasoning the original Story 12 amendment gave for
+   preferring an explicit chain over relying on implicit Qt behavior, not
+   about correctness.)
+4. **The now-dead `uppercase_as_typed(self._my_sig_info)` and
+   `uppercase_as_typed(self._operator)` calls are removed** from
+   `QsoEntryFormWidget.__init__`. Both fields are disabled immediately
+   after construction and can never receive typed input again on this
+   form, so `uppercase_as_typed`'s `textEdited` connection would never
+   fire — keeping it would be dead code, which
+   `.claude/rules/backend.md`'s SRP guidance and this project's "don't
+   leave unreachable paths" convention (see the Story 6 field-expansion
+   amendment's `StationDefaults` parameter removal, point 3 above) both
+   argue against. `uppercase_field.uppercase_as_typed()` itself is
+   unaffected and still used for CALL (this form) and for the
+   session-setup dialog's park reference and Operator fields — those
+   remain editable, per-session, one-time-entry fields, untouched by this
+   amendment (requirements Story 12 scopes the read-only change to the
+   main entry form only).
+5. **No domain/application change**, same as every prior Story 12
+   amendment — this is a UI-only reshuffle plus a Qt widget-state flag.
+   `SubmitQsoRequest` construction in `_on_submit_clicked()` is unchanged:
+   `self._my_sig_info.text()`, `self._qso_date.date()`,
+   `self._operator.text()`, and `self._my_rig.text()` all still return the
+   field's current value when disabled — Qt only blocks *input*, not
+   *reads* — so the submitted QSO still carries whatever value
+   `apply_defaults()` last set, exactly as before.
+
 ## Domain Model
 
 > Pure business logic. Zero framework/infra imports. Lives under
@@ -670,7 +764,7 @@ satisfying "without discarding the previous session's persisted file."
 | `SessionSetupDialog` | Collect the park reference, date, start time, starting frequency, operator, rig, TX power, and mode for a new session, or report that the operator chose to quit; pre-fill frequency/operator/rig/TX power/mode from `StationDefaults()`; disable "OK" while the park reference, frequency, operator, rig, or TX power is empty; uppercase the park reference and operator live as typed via `uppercase_as_typed()` (Story 7, Story 8); its "Time of first QSO" `QTimeEdit` uses `setDisplayFormat("HH:mm")`, hiding seconds entry (Story 14); its "Mode" field is the same non-editable `QComboBox` populated from `MODE_OPTIONS` as the main entry form's MODE field (Story 6, extended by the Story 6 field-expansion amendment) | `StationDefaults`, `MODE_OPTIONS` (both re-exported from `application/logging_session/dto.py`, read-only, for its own field pre-fill/population); exposes `.setup_result: SessionSetupResult \| None` after `.exec()` — named to avoid shadowing `QDialog`'s own `.result()` method, the same reason `SessionResumePromptDialog` uses `.choice` |
 | `session_bootstrap.bootstrap_session()` | Run the startup sequence (resume prompt if applicable, then either resume or the setup dialog + `StartNewSessionCommand`) and decide whether the app should proceed at all | `CheckForResumableSessionQuery`, `ResumeSessionCommand`, `StartNewSessionCommand`; shows `SessionResumePromptDialog`/`SessionSetupDialog` |
 | `uppercase_field.uppercase_as_typed(line_edit)` | Make one `QLineEdit` uppercase its text live as the operator types, preserving cursor position (Story 5/7) | none (pure Qt helper; called once per field during widget `__init__`) |
-| `QsoEntryFormWidget` | Render the 11 entry fields in 3 columns — column 1: CALL, RST_RCVD, RST_SENT, TIME_ON; column 2: FREQ, MY_SIG_INFO, QSO_DATE, MODE; column 3: OPERATOR, MY_RIG, TX_PWR (Story 12) — and emit the submitted values; apply a new `EntryDefaultsDto` to pre-fill itself and focus CALL; uppercase CALL, MY_SIG_INFO, and OPERATOR live as the operator types, via `uppercase_as_typed()` (requirements Story 5, 7, 8); render MODE as a non-editable `QComboBox` populated from `MODE_OPTIONS`, defaulting to "CW" (Story 9); update RST_SENT/RST_RCVD to the new MODE's default when MODE changes, for each field not already edited away from its previous default (Story 13); submit on Enter/Return from any field when CALL is non-empty, via an `eventFilter` installed on all 11 fields (Story 11); its TIME_ON `QTimeEdit` uses `setDisplayFormat("HH:mm")`, hiding seconds entry (Story 14); Tab through the 11 fields column-major, in the same fixed order as their pre-column-layout sequence, via an explicit `setTabOrder()` chain (Story 12) | emits `SubmitQsoRequest` via a Qt signal |
+| `QsoEntryFormWidget` | Render the 11 entry fields in 3 columns — column 1: CALL, RST_RCVD, RST_SENT, TIME_ON; column 2: FREQ, MODE, TX_PWR; column 3 (all read-only): MY_SIG_INFO, QSO_DATE, OPERATOR, MY_RIG (Story 12) — and emit the submitted values; apply a new `EntryDefaultsDto` to pre-fill itself (including the 4 read-only fields, via plain `setText()`/`setDate()`, which work regardless of `setEnabled(False)`) and focus CALL; uppercase CALL live as the operator types, via `uppercase_as_typed()` (requirements Story 5; MY_SIG_INFO and OPERATOR no longer use this on the entry form, since Story 12 made both read-only there); render MODE as a non-editable `QComboBox` populated from `MODE_OPTIONS`, defaulting to "CW" (Story 9); update RST_SENT/RST_RCVD to the new MODE's default when MODE changes, for each field not already edited away from its previous default (Story 13); submit on Enter/Return from any of the 7 editable fields when CALL is non-empty, via an `eventFilter` installed on those 7 only (Story 11, narrowed by Story 12's read-only amendment); its TIME_ON `QTimeEdit` uses `setDisplayFormat("HH:mm")`, hiding seconds entry (Story 14); Tab through only the 7 editable fields, column-major, via an explicit `setTabOrder()` chain that omits the 4 disabled fields entirely — `setEnabled(False)` already makes Qt skip a disabled widget during focus traversal, so this is belt-and-braces, matching the same "don't rely on implicit Qt behavior" reasoning the original Tab-order amendment gave (Story 12); render MY_SIG_INFO, QSO_DATE, OPERATOR, and MY_RIG `setEnabled(False)` — the platform's standard grayed-out disabled style, rejecting operator input while still receiving `apply_defaults()`'s programmatic updates, including QSO_DATE's automatic midnight-rollover advance (Story 12) | emits `SubmitQsoRequest` via a Qt signal |
 | `QsoListWidget` | Display submitted QSOs, in order, read-only, with alternating row background colors from the system palette (Story 15), showing only the 7 columns CALL, QSO_DATE, TIME_ON, RST_RCVD, RST_SENT, FREQ, MODE (Story 16) | renders `QsoDto` rows appended to it |
 | `QsoEntryController` | Wire widget signals to application commands/queries and route results/errors back to the widgets | `SubmitQsoCommand`, `GenerateAdifCommand` |
 | `composition_root.py` (`main`) | Construct the concrete adapters, run `bootstrap_session()`, and — only if it returns a result rather than `None` — construct/show `MainWindow` and run the Qt event loop | — |
@@ -803,10 +897,13 @@ Mirrors `src/` under `tests/`.
   Story 7: a new `test_uppercase_field.py` covers `uppercase_as_typed()`
   directly against a bare `QLineEdit` (lowercase typed → displays
   uppercase; cursor position preserved after a mid-string edit); typing
-  lowercase into MY_SIG_INFO on `QsoEntryFormWidget` and into the setup
-  dialog's park reference field both display uppercase immediately, the
-  same way CALL already does. Story 8: the same live-uppercase test
-  repeated for the OPERATOR field. Story 9: the MODE `QComboBox` offers
+  lowercase into the setup dialog's park reference field displays
+  uppercase immediately, the same way CALL already does. (The matching
+  assertion for typing into MY_SIG_INFO on `QsoEntryFormWidget` is removed
+  by the Story 12 read-only amendment below, along with the call it was
+  testing.) Story 8: the same live-uppercase test repeated for the setup
+  dialog's Operator field only — the `QsoEntryFormWidget` OPERATOR
+  assertion is likewise removed by the Story 12 read-only amendment. Story 9: the MODE `QComboBox` offers
   exactly `["CW", "SSB"]` as its items and is not editable;
   `apply_defaults()` with `mode="SSB"` sets the combo box's current text
   to `"SSB"`; clicking Submit with "SSB" selected includes `mode="SSB"`
@@ -840,24 +937,28 @@ Mirrors `src/` under `tests/`.
   in CI) — the existing test is **modified** in place to assert the new
   height fraction rather than adding a second test. Story 11: with the
   form pre-filled and CALL set non-empty, pressing Enter while focus is in
-  a *non-CALL* field (e.g. MY_RIG) still emits `submitted` — proving the
-  "any field" behavior, not just CALL's own key handling; pressing Enter
+  a *non-CALL* field (e.g. TX_PWR — **changed** from the original
+  example, MY_RIG, by the Story 12 read-only amendment below, since MY_RIG
+  can no longer receive focus at all once disabled) still emits
+  `submitted` — proving the "any field" behavior, not just CALL's own key
+  handling; pressing Enter
   while CALL is empty emits nothing (`qtbot.waitSignal(...,
   raising=False)` times out) and leaves the other fields' values
   unchanged; pressing Enter in CALL itself (now non-empty) also emits,
   matching the button-click test's existing assertions on the emitted
-  `SubmitQsoRequest`. Story 12: reading `widget._column_1`,
-  `widget._column_2`, and `widget._column_3`'s row label texts, in order,
-  equal `["CALL", "RST_RCVD", "RST_SENT", "TIME_ON"]`, `["FREQ",
-  "MY_SIG_INFO", "QSO_DATE", "MODE"]`, and `["OPERATOR", "MY_RIG",
-  "TX_PWR"]` respectively (updated from the original Story 12 amendment's
-  single-`widget._form` assertion, now that the fields live in three
-  layouts); separately, walking the Tab chain from `widget._call` via
-  repeated `.nextInFocusChain()` calls still visits the 11 field widgets
-  (`widget._call, widget._rst_rcvd, ...`) in that same original order — a
-  black-box check that the `setTabOrder()` chain's actual effect is
-  unaffected by the column-layout amendment, not just that the calls were
-  made. Story 13: with the form pre-filled at its "CW" default (RST_SENT/
+  `SubmitQsoRequest`. Story 12 (column layout, superseded by the read-only
+  amendment below — see its test paragraph for the current, authoritative
+  assertions): reading `widget._column_1`, `widget._column_2`, and
+  `widget._column_3`'s row label texts, in order, equal `["CALL",
+  "RST_RCVD", "RST_SENT", "TIME_ON"]`, `["FREQ", "MY_SIG_INFO", "QSO_DATE",
+  "MODE"]`, and `["OPERATOR", "MY_RIG", "TX_PWR"]` respectively (updated
+  from the original Story 12 amendment's single-`widget._form` assertion,
+  now that the fields live in three layouts); separately, walking the Tab
+  chain from `widget._call` via repeated `.nextInFocusChain()` calls still
+  visits the 11 field widgets (`widget._call, widget._rst_rcvd, ...`) in
+  that same original order — a black-box check that the `setTabOrder()`
+  chain's actual effect is unaffected by the column-layout amendment, not
+  just that the calls were made. Story 13: with the form pre-filled at its "CW" default (RST_SENT/
   RST_RCVD both `"599"`), selecting "SSB" in the MODE combo box updates
   both to `"59"`; selecting "CW" again updates both back to `"599"`;
   after manually editing RST_SENT to `"579"` while MODE is "CW", selecting
@@ -880,6 +981,34 @@ Mirrors `src/` under `tests/`.
   column-index assertions (written against the old 14-column layout) are
   **modified** to the new column indices rather than left to silently
   assert against the wrong columns.
+- Story 12 read-only fields (authoritative — supersedes the column-layout
+  test paragraph above for `widget._column_2`/`widget._column_3` and the
+  Tab-chain assertion): reading `widget._column_1`, `widget._column_2`,
+  and `widget._column_3`'s row label texts, in order, equal `["CALL",
+  "RST_RCVD", "RST_SENT", "TIME_ON"]`, `["FREQ", "MODE", "TX_PWR"]`, and
+  `["MY_SIG_INFO", "QSO_DATE", "OPERATOR", "MY_RIG"]` respectively (the
+  first is unchanged from before; the latter two are **modified** in
+  place); `widget._my_sig_info.isEnabled()`,
+  `widget._qso_date.isEnabled()`, `widget._operator.isEnabled()`, and
+  `widget._my_rig.isEnabled()` are all `False`, while every other field's
+  `.isEnabled()` stays `True`; calling `apply_defaults(...)` with a
+  `EntryDefaultsDto` still sets `widget._my_sig_info.text()`,
+  `widget._qso_date.date()`, `widget._operator.text()`, and
+  `widget._my_rig.text()` to the given values despite the fields being
+  disabled — proving pre-fill/carry-forward still reaches them; walking
+  the Tab chain from `widget._call` via repeated `.nextInFocusChain()`
+  calls now visits only the 7 editable fields, in order (`widget._call,
+  widget._rst_rcvd, widget._rst_sent, widget._time_on, widget._freq,
+  widget._mode, widget._tx_pwr`) — **modified** from the original Story 12
+  amendment's 11-widget assertion, since Qt's focus chain skips the 4
+  disabled widgets automatically; submitting the form still emits a
+  `SubmitQsoRequest` whose `my_sig_info`/`operator`/`my_rig` fields match
+  what `apply_defaults()` last set, even though those fields are disabled
+  — proving `.text()`/`.date()` reads on a disabled widget still return
+  its current value. The Story 7/8 live-uppercase-on-entry-form tests for
+  MY_SIG_INFO and OPERATOR (see the GUI bullet above) are **removed**, not
+  just modified — there is no longer any typed-input path into either
+  field on this form to test.
 - Story 6 field expansion: **domain** —
   `EntryDefaults.seed(now, operator="SM6Y", mode="CW", my_rig="Elecraft KX2",
   tx_pwr="5")` (no `my_sig_info`/`freq`) returns the same field values the
@@ -914,6 +1043,24 @@ Mirrors `src/` under `tests/`.
   `freq` assertion from the earlier Story 6 extension.
 
 ## Open Questions / Risks
+
+**Approved 2026-09-07.** requirements.md's Story 12
+read-only-fields change (2026-09-07) has one reasonable shape:
+`QWidget.setEnabled(False)` is the single Qt mechanism that gets the
+grayed-out appearance, the rejection of typed/clicked input, and the
+Tab-chain skip all at once — there's no real alternative once "disabled,
+Qt-standard appearance" was the chosen answer during requirements
+clarification (as opposed to, say, a custom stylesheet plus
+`QLineEdit.setReadOnly(True)`/`QAbstractSpinBox.setReadOnly(True)`, which
+would need two different per-widget-type mechanisms and wouldn't itself
+gray anything out). The one genuine design decision — whether to also trim
+`self._fields`, or leave all 11 in the `setTabOrder()` chain and rely on
+`setEnabled(False)` to skip the 4 automatically at runtime — is resolved
+in favor of trimming, for the same "don't depend on implicit Qt behavior"
+reasoning the original Story 12 amendment already used to justify an
+explicit chain over the layout's default order; either choice is
+behaviorally identical, so this is not a blocking ambiguity, just a
+documented preference. No other open question remains for this amendment.
 
 **Approved 2026-09-03.** The Story 6 field-expansion amendment above
 resolves the one open question

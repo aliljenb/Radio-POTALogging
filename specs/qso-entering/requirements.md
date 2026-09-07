@@ -19,6 +19,14 @@ partly from application constants; small cross-reference edits follow in
 Story 1, Story 8, and Story 9. Ready for a `/spec-design qso-entering`
 follow-up pass._
 
+_Story 12 changed 2026-09-07: the entry form's 3-column layout is revised
+(MODE and TX_PWR move to column 2; MY_SIG_INFO, QSO_DATE, OPERATOR, and
+MY_RIG move to column 3 and become read-only), Tab order now skips the 4
+read-only fields, and small cross-reference edits follow in Story 1
+(editability carve-out), Story 7 and Story 8 (entry-form live-uppercase
+criteria are now inapplicable there). Ready for a `/spec-design
+qso-entering` follow-up pass._
+
 ## Introduction
 
 After a portable "Parks On The Air" (POTA) activation, an operator needs to
@@ -56,11 +64,13 @@ between entries, and triggering that ADIF export on demand.
 - [ ] THE SYSTEM SHALL always associate MY_SIG with the fixed value "POTA"
       for every QSO, whether or not MY_SIG is shown as an editable field.
 - [ ] THE SYSTEM SHALL allow every pre-filled field to be edited by the
-      operator before submission.
-- [ ] IF the operator changes the value of a pre-filled field before
-      submitting, THEN THE SYSTEM SHALL treat the edited value (not the
-      original constant) as the value to carry forward per Story 2 — except
-      RST_SENT and RST_RCVD, which always reset to the next entry's
+      operator before submission, EXCEPT MY_SIG_INFO, QSO_DATE, OPERATOR,
+      and MY_RIG, which the entry form shows read-only (Story 12) and which
+      can only be changed by starting a new session (Story 3, Story 6).
+- [ ] IF the operator changes the value of a pre-filled, editable field
+      before submitting, THEN THE SYSTEM SHALL treat the edited value (not
+      the original constant) as the value to carry forward per Story 2 —
+      except RST_SENT and RST_RCVD, which always reset to the next entry's
       MODE-dependent default on the next entry regardless of any edit
       (Story 2, Story 13).
 - [ ] THE SYSTEM SHALL require FREQ to be entered in MHz as a decimal
@@ -218,9 +228,10 @@ between entries, and triggering that ADIF export on demand.
       letters as uppercase, regardless of the physical keyboard's
       case/layout state (e.g. Caps Lock off, a non-US layout) — the same
       behavior as CALL (Story 5).
-- [ ] WHEN the operator types into the MY_SIG_INFO field on the main QSO
-      entry form, THE SYSTEM SHALL display any letters as uppercase in the
-      same way.
+- [ ] THE SYSTEM SHALL NOT apply live-typing uppercase handling to
+      MY_SIG_INFO on the main QSO entry form, since Story 12 makes that
+      field read-only there; the uppercase value set via the session-setup
+      dialog is simply displayed as-is.
 - [ ] THE SYSTEM SHALL leave non-letter characters in MY_SIG_INFO (digits,
       "-", etc.) unchanged.
 - [ ] WHEN a QSO is submitted, THE SYSTEM SHALL store MY_SIG_INFO with any
@@ -241,10 +252,10 @@ between entries, and triggering that ADIF export on demand.
 
 **Acceptance criteria:**
 
-- [ ] WHEN the operator types into the OPERATOR field, THE SYSTEM SHALL
-      display any letters as uppercase, regardless of the physical
-      keyboard's case/layout state (e.g. Caps Lock off, a non-US layout)
-      — the same behavior as CALL (Story 5).
+- [ ] THE SYSTEM SHALL NOT apply live-typing uppercase handling to
+      OPERATOR on the main QSO entry form, since Story 12 makes that field
+      read-only there; the uppercase value set via the session-setup
+      dialog is simply displayed as-is.
 - [ ] WHEN the operator types into the session-setup dialog's "Operator"
       field (Story 6), THE SYSTEM SHALL display any letters as uppercase
       in the same way.
@@ -327,12 +338,14 @@ between entries, and triggering that ADIF export on demand.
       additional trigger for the same submit action the button already
       performs.
 
-### Story 12: Entry fields follow a fixed display and Tab order
+### Story 12: Entry fields follow a fixed display and Tab order, with four fields shown read-only
 
 > As an **operator**, I want **the entry form's fields laid out and
-> Tab-ordered to match how I naturally fill them in from a paper log**, so
-> that **I can move through the form quickly without hunting for the next
-> field or reaching for the mouse**.
+> Tab-ordered to match how I naturally fill them in from a paper log, with
+> the fields that don't change QSO-to-QSO shown but locked**, so that **I
+> can move through the form quickly without hunting for the next field or
+> reaching for the mouse, and can't accidentally overtype a value that's
+> meant to stay the same for the whole session**.
 
 **Acceptance criteria:**
 
@@ -341,20 +354,41 @@ between entries, and triggering that ADIF export on demand.
 
   | Column 1 | Column 2 | Column 3 |
   |----------|----------|----------|
-  | CALL | FREQ | OPERATOR |
-  | RST_RCVD | MY_SIG_INFO | MY_RIG |
-  | RST_SENT | QSO_DATE | TX_PWR |
-  | TIME_ON | MODE | |
+  | CALL | FREQ | MY_SIG_INFO (read-only) |
+  | RST_RCVD | MODE | QSO_DATE (read-only) |
+  | RST_SENT | TX_PWR | OPERATOR (read-only) |
+  | TIME_ON | | MY_RIG (read-only) |
 
-- [ ] THE SYSTEM SHALL set the keyboard Tab order to visit the 11 fields
-      column-major — top-to-bottom through column 1, then column 2, then
-      column 3 — which is the same field-to-field sequence as before this
-      story's column grouping: CALL, RST_RCVD, RST_SENT, TIME_ON, FREQ,
-      MY_SIG_INFO, QSO_DATE, MODE, OPERATOR, MY_RIG, TX_PWR.
+- [ ] THE SYSTEM SHALL render MY_SIG_INFO, QSO_DATE, OPERATOR, and MY_RIG
+      as read-only on the entry form: THE SYSTEM SHALL continue to display
+      each field's current value (from the first-entry defaults of Story 1
+      or carried forward per Story 2), but SHALL NOT accept typed or
+      otherwise operator-initiated edits to these four fields on the entry
+      form.
+- [ ] THE SYSTEM SHALL render MY_SIG_INFO, QSO_DATE, OPERATOR, and MY_RIG
+      with a disabled/grayed-out appearance (the platform's standard
+      disabled-widget style), visually distinguishing them from the 7
+      still-editable fields (CALL, RST_RCVD, RST_SENT, TIME_ON, FREQ,
+      MODE, TX_PWR).
+- [ ] THE SYSTEM SHALL continue to update QSO_DATE automatically when the
+      midnight-rollover rule (Story 2) applies, even though QSO_DATE is
+      read-only — "read-only" means the operator cannot type into the
+      field, not that the system stops maintaining its value.
+- [ ] THE SYSTEM SHALL set the keyboard Tab order to visit only the 7
+      still-editable fields, column-major — top-to-bottom through column
+      1, then column 2 — skipping the 4 read-only fields entirely: CALL,
+      RST_RCVD, RST_SENT, TIME_ON, FREQ, MODE, TX_PWR.
 - [ ] THE SYSTEM SHALL NOT otherwise change any field's behavior (default
-      value, carry-forward, uppercase normalization, validation) — this
-      story only changes where fields appear and how Tab moves between
-      them.
+      value, carry-forward, uppercase normalization, validation) for any
+      of the 11 fields — this story only changes where fields appear, which
+      4 are read-only, and how Tab moves between the remaining 7.
+- [ ] THE SYSTEM SHALL NOT change how MY_SIG_INFO, QSO_DATE, OPERATOR, or
+      MY_RIG are set in the first place — they still come from the
+      session-setup dialog (Story 6) for the first entry and are still
+      carried forward unchanged (or, for QSO_DATE, rolled over) per Story
+      2; the only way to change MY_SIG_INFO, OPERATOR, or MY_RIG mid-log is
+      to start a new session (Story 3, Story 6), since the entry form no
+      longer offers a way to edit them directly.
 
 ### Story 13: RST_SENT/RST_RCVD default according to MODE
 
@@ -492,6 +526,12 @@ between entries, and triggering that ADIF export on demand.
 - Removing TIME_OFF, BAND, OPERATOR, MY_SIG, MY_SIG_INFO, MY_RIG, or
   TX_PWR from what is stored per QSO or from the generated ADIF file —
   Story 16 only hides them from the table display.
+- Editing MY_SIG_INFO, QSO_DATE, OPERATOR, or MY_RIG directly on the entry
+  form — Story 12 makes these 4 fields read-only there; they are only set
+  via the session-setup dialog (Story 6) at the start of a session, or (for
+  QSO_DATE only) advanced automatically on midnight rollover (Story 2).
+- Tabbing keyboard focus onto a read-only field (MY_SIG_INFO, QSO_DATE,
+  OPERATOR, MY_RIG) — Story 12's Tab order skips all 4 entirely.
 
 ## Open questions
 
@@ -535,14 +575,23 @@ between entries, and triggering that ADIF export on demand.
       ADIF 6-digit `HHMMSS` output format with `00` seconds is produced at
       "Generate ADIF" time, then `/spec-tasks qso-entering` before
       `/implement-task` can add it.
-- [ ] Story 12 needs a follow-up pass through `/spec-design qso-entering`
-      to decide the Qt mechanism for the field order: reordering
-      `QsoEntryFormWidget`'s `QFormLayout.addRow(...)` calls to match the
-      new display order (which also determines default Tab order for a
-      `QFormLayout`, since Qt tabs through child widgets in the order
-      they're added, unless overridden), or whether an explicit
-      `QWidget.setTabOrder(...)` chain is also needed to be safe — then
-      `/spec-tasks qso-entering` before `/implement-task` can add it.
+- [ ] Story 12 (updated 2026-09-07 to move MY_SIG_INFO, QSO_DATE,
+      OPERATOR, and MY_RIG into column 3 as read-only fields, and MODE/
+      TX_PWR into column 2) needs a follow-up pass through `/spec-design
+      qso-entering` to decide: the Qt mechanism for the field order
+      (reordering `QsoEntryFormWidget`'s `QFormLayout.addRow(...)` calls
+      per column, plus an explicit `QWidget.setTabOrder(...)` chain over
+      just the 7 editable fields, since a `QFormLayout`'s default Tab
+      order would otherwise include the read-only ones too); how
+      MY_SIG_INFO/QSO_DATE/OPERATOR/MY_RIG's widgets are set
+      non-editable/disabled (`QLineEdit.setReadOnly`/`setEnabled(False)`,
+      or the `QDateEdit`/other widget's equivalent) while still receiving
+      programmatic updates (QSO_DATE's midnight rollover, Story 2); and
+      how this interacts with Story 11's Enter-to-submit `eventFilter`,
+      currently installed on all 11 fields. Also needs to remove the
+      now-dead live-uppercase-on-entry-form-typing wiring for MY_SIG_INFO
+      (Story 7) and OPERATOR (Story 8) that this update makes unreachable.
+      Then `/spec-tasks qso-entering` before `/implement-task` can add it.
 
 Resolved from earlier drafting, still valid:
 
