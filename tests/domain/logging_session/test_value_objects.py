@@ -13,7 +13,6 @@ from radio_pota_logging.domain.logging_session.value_objects import (
     Qso,
     QsoTimestamp,
     SessionStart,
-    StationDefaults,
     default_rst_for_mode,
 )
 
@@ -107,9 +106,19 @@ def test_qso_timestamp_plus_two_minutes_normalizes_seconds_from_nonzero_input() 
     assert timestamp.plus_two_minutes() == QsoTimestamp(date(2026, 8, 31), time(0, 1))
 
 
+def _seed(**overrides: object) -> EntryDefaults:
+    fields: dict[str, object] = {
+        "operator": "SM6Y",
+        "mode": "CW",
+        "my_rig": "Elecraft KX2",
+        "tx_pwr": "5",
+    }
+    fields.update(overrides)
+    return EntryDefaults.seed(QsoTimestamp(date(2026, 8, 30), time(9, 0)), **fields)  # type: ignore[arg-type]
+
+
 def test_entry_defaults_seed_leaves_my_sig_info_and_freq_empty() -> None:
-    now = QsoTimestamp(date(2026, 8, 30), time(9, 0))
-    defaults = EntryDefaults.seed(StationDefaults(), now)
+    defaults = _seed()
     assert defaults.my_sig_info == ""
     assert defaults.freq == ""
     assert defaults.operator == "SM6Y"
@@ -122,27 +131,33 @@ def test_entry_defaults_seed_leaves_my_sig_info_and_freq_empty() -> None:
 
 def test_entry_defaults_seed_uses_given_my_sig_info() -> None:
     now = QsoTimestamp(date(2026, 8, 30), time(9, 0))
-    defaults = EntryDefaults.seed(StationDefaults(), now, my_sig_info="K-1234")
+    defaults = _seed(my_sig_info="K-1234")
     assert defaults.my_sig_info == "K-1234"
     assert defaults.timestamp == now
 
 
 def test_entry_defaults_seed_normalizes_my_sig_info_to_uppercase() -> None:
-    now = QsoTimestamp(date(2026, 8, 30), time(9, 0))
-    defaults = EntryDefaults.seed(StationDefaults(), now, my_sig_info="k-1234")
+    defaults = _seed(my_sig_info="k-1234")
     assert defaults.my_sig_info == "K-1234"
 
 
 def test_entry_defaults_seed_uses_given_freq() -> None:
-    now = QsoTimestamp(date(2026, 8, 30), time(9, 0))
-    defaults = EntryDefaults.seed(StationDefaults(), now, freq="14.062")
+    defaults = _seed(freq="14.062")
     assert defaults.freq == "14.062"
 
 
 def test_entry_defaults_seed_normalizes_operator_to_uppercase() -> None:
-    now = QsoTimestamp(date(2026, 8, 30), time(9, 0))
-    defaults = EntryDefaults.seed(StationDefaults(operator="sm6y"), now)
+    defaults = _seed(operator="sm6y")
     assert defaults.operator == "SM6Y"
+
+
+def test_entry_defaults_seed_uses_given_operator_mode_my_rig_tx_pwr() -> None:
+    defaults = _seed(operator="W1AW", mode="SSB", my_rig="FT-891", tx_pwr="10")
+    assert defaults.operator == "W1AW"
+    assert defaults.mode == "SSB"
+    assert defaults.my_rig == "FT-891"
+    assert defaults.tx_pwr == "10"
+    assert defaults.rst_sent == "59"
 
 
 def test_mode_options_is_cw_and_ssb() -> None:
@@ -161,8 +176,7 @@ def test_default_rst_for_mode(mode: str, expected: str) -> None:
 
 
 def test_entry_defaults_seed_uses_ssb_rst_default_for_ssb_station_mode() -> None:
-    now = QsoTimestamp(date(2026, 8, 30), time(9, 0))
-    defaults = EntryDefaults.seed(StationDefaults(mode="SSB"), now)
+    defaults = _seed(mode="SSB")
     assert defaults.rst_sent == "59"
     assert defaults.rst_rcvd == "59"
 

@@ -8,6 +8,7 @@ from pathlib import Path
 
 from radio_pota_logging.domain.logging_session.value_objects import (
     MODE_OPTIONS,
+    StationDefaults,
     default_rst_for_mode,
 )
 
@@ -17,6 +18,7 @@ __all__ = [
     "EntryDefaultsDto",
     "QsoDto",
     "SessionStartResult",
+    "StationDefaults",
     "SubmitQsoRequest",
     "SubmitQsoResult",
     "default_rst_for_mode",

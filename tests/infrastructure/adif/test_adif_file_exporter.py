@@ -1,12 +1,14 @@
 from datetime import date, time
 
 from radio_pota_logging.domain.logging_session.entities import LoggingSession
-from radio_pota_logging.domain.logging_session.value_objects import QsoTimestamp, StationDefaults
+from radio_pota_logging.domain.logging_session.value_objects import QsoTimestamp
 from radio_pota_logging.infrastructure.adif.adif_file_exporter import AdifFileExporter
+
+_STATION_KWARGS = {"operator": "SM6Y", "mode": "CW", "my_rig": "Elecraft KX2", "tx_pwr": "5"}
 
 
 def test_export_produces_header_and_one_record_per_qso() -> None:
-    session = LoggingSession.start(StationDefaults(), QsoTimestamp(date(2026, 8, 30), time(9, 0)))
+    session = LoggingSession.start(QsoTimestamp(date(2026, 8, 30), time(9, 0)), **_STATION_KWARGS)
     session.record_qso(
         call="W1AW",
         qso_date=date(2026, 8, 30),
@@ -58,7 +60,7 @@ def test_export_empty_session_has_header_but_no_records() -> None:
 
 
 def test_export_writes_zero_seconds_for_a_qso_built_from_nonzero_seconds_input() -> None:
-    session = LoggingSession.start(StationDefaults(), QsoTimestamp(date(2026, 8, 30), time(9, 0)))
+    session = LoggingSession.start(QsoTimestamp(date(2026, 8, 30), time(9, 0)), **_STATION_KWARGS)
     session.record_qso(
         call="W1AW",
         qso_date=date(2026, 8, 30),

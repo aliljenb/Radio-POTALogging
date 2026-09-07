@@ -103,13 +103,15 @@ class SessionStart:
 
 @dataclass(frozen=True)
 class StationDefaults:
-    """Fixed application-level constants used to seed a brand-new session."""
+    """Fixed application-level constants used to pre-fill SessionSetupDialog's
+    own default field values."""
 
     operator: str = "SM6Y"
     mode: str = "CW"
     my_sig: str = "POTA"
     my_rig: str = "Elecraft KX2"
     tx_pwr: str = "5"
+    freq: str = "14.060"
 
 
 # The only two supported MODE values (requirements.md Story 9).
@@ -145,20 +147,24 @@ class EntryDefaults:
     @classmethod
     def seed(
         cls,
-        station_defaults: StationDefaults,
         now: QsoTimestamp,
+        *,
+        operator: str,
+        mode: str,
+        my_rig: str,
+        tx_pwr: str,
         my_sig_info: str = "",
         freq: str = "",
     ) -> EntryDefaults:
         return cls(
-            operator=station_defaults.operator,
-            mode=station_defaults.mode,
+            operator=operator,
+            mode=mode,
             my_sig_info=my_sig_info,
-            rst_sent=default_rst_for_mode(station_defaults.mode),
-            rst_rcvd=default_rst_for_mode(station_defaults.mode),
+            rst_sent=default_rst_for_mode(mode),
+            rst_rcvd=default_rst_for_mode(mode),
             freq=freq,
-            my_rig=station_defaults.my_rig,
-            tx_pwr=station_defaults.tx_pwr,
+            my_rig=my_rig,
+            tx_pwr=tx_pwr,
             timestamp=now,
         )
 

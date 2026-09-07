@@ -39,8 +39,12 @@ class LoggingSession:
     @classmethod
     def start(
         cls,
-        station_defaults: StationDefaults,
         now: QsoTimestamp,
+        *,
+        operator: str,
+        mode: str,
+        my_rig: str,
+        tx_pwr: str,
         my_sig_info: str = "",
         freq: str = "",
     ) -> LoggingSession:
@@ -48,7 +52,13 @@ class LoggingSession:
             session_id=SessionId.generate(),
             qsos=(),
             next_entry_defaults=EntryDefaults.seed(
-                station_defaults, now, my_sig_info=my_sig_info, freq=freq
+                now,
+                operator=operator,
+                mode=mode,
+                my_rig=my_rig,
+                tx_pwr=tx_pwr,
+                my_sig_info=my_sig_info,
+                freq=freq,
             ),
             session_start=SessionStart(qso_date=now.qso_date, my_sig_info=my_sig_info),
         )

@@ -6,9 +6,40 @@
 - [x] In Review
 - [x] Approved
 
-_Prior tasks (through Story 15) remain previously approved and
+_Prior tasks (through Story 16) remain previously approved and
 implemented. The two Story 16 tasks (fixed, reduced QSO table column set)
 approved 2026-09-01._
+
+_The Story 6 field-expansion tasks below (session-setup dialog grows from
+4 to 8 fields; `EntryDefaults.seed`/`LoggingSession.start` take
+OPERATOR/MODE/MY_RIG/TX_PWR from the dialog's result instead of
+`StationDefaults`) are derived from `specs/qso-entering/design.md`'s Story
+6 field-expansion amendment (approved 2026-09-03) — approved and
+implemented 2026-09-03. Implementing the `LoggingSession.start`/
+`EntryDefaults.seed` signature change also required fixing fixture call
+sites in three test files not named above
+(`tests/application/logging_session/test_queries.py`,
+`tests/infrastructure/adif/test_adif_file_exporter.py`,
+`tests/infrastructure/repositories/test_file_logging_session_repository.py`)
+and one stale pre-existing assertion in
+`tests/api/test_session_setup_dialog.py`
+(`test_ok_disabled_until_park_reference_and_freq_are_non_empty`, whose
+"typing park reference alone still leaves OK disabled" assumption no
+longer held once Frequency started pre-filling non-empty) — mechanical
+fallout of the signature/pre-fill changes, not a design deviation._
+
+_The Story 12 read-only-fields tasks below (column 2 becomes FREQ, MODE,
+TX_PWR; column 3 becomes MY_SIG_INFO, QSO_DATE, OPERATOR, MY_RIG, all four
+disabled/grayed-out and skipped by Tab) are derived from
+`specs/qso-entering/design.md`'s Story 12 read-only-fields amendment
+(approved 2026-09-07) — approved and implemented 2026-09-07. Implementing
+this also removed two now-dead tests in
+`tests/api/test_qso_entry_form_widget.py`
+(`test_typing_lowercase_into_my_sig_info_displays_uppercase`,
+`test_typing_lowercase_into_operator_displays_uppercase`) and changed the
+field under test in `test_enter_in_a_non_call_field_submits_when_call_is_non_empty`
+from MY_RIG to TX_PWR, since MY_RIG can no longer receive keyboard focus —
+mechanical fallout of the read-only change, not a design deviation._
 
 ## How to use this file
 
@@ -149,6 +180,31 @@ single, independently completable unit of work with a clear file target.
       (the `mode` parameter `record_qso` was called with — the
       just-submitted QSO's MODE, already carried forward verbatim) per
       design.md § Overview (Story 13 amendment) and § Value Objects.
+- [x] `value_objects.py` — **modify** `StationDefaults`: add a `freq: str =
+      "14.060"` field, alongside the existing `operator`/`mode`/`my_sig`/
+      `my_rig`/`tx_pwr` per design.md § Value Objects, Story 6
+      field-expansion amendment.
+- [x] `value_objects.py` — **modify** `EntryDefaults.seed`: drop the
+      `station_defaults: StationDefaults` parameter; add required
+      keyword-only parameters `operator: str, mode: str, my_rig: str,
+      tx_pwr: str` (after a bare `*`, alongside the existing `my_sig_info:
+      str = ""` and `freq: str = ""`, which keep their defaults
+      unchanged); build the returned `EntryDefaults` from these new
+      parameters (`operator=operator, mode=mode, my_rig=my_rig,
+      tx_pwr=tx_pwr`) instead of `station_defaults.operator`/`.mode`/
+      `.my_rig`/`.tx_pwr`; change both `default_rst_for_mode(...)` calls
+      from `default_rst_for_mode(station_defaults.mode)` to
+      `default_rst_for_mode(mode)` per design.md § Value Objects
+      (`EntryDefaults` row), Story 6 field-expansion amendment.
+- [x] `entities.py` — **modify** `LoggingSession.start`: drop the
+      `station_defaults: StationDefaults` parameter; add required
+      keyword-only parameters `operator: str, mode: str, my_rig: str,
+      tx_pwr: str` (alongside the existing `my_sig_info: str = ""` and
+      `freq: str = ""`); forward them into `EntryDefaults.seed(now,
+      operator=operator, mode=mode, my_rig=my_rig, tx_pwr=tx_pwr,
+      my_sig_info=my_sig_info, freq=freq)` per design.md § Value Objects
+      (`EntryDefaults` row) and § Application Layer (`StartNewSessionCommand`
+      row), Story 6 field-expansion amendment.
 
 ## Application Layer
 
@@ -189,6 +245,17 @@ single, independently completable unit of work with a clear file target.
 - [x] `dto.py` — **modify**: re-export `default_rst_for_mode` from
       `domain/logging_session/value_objects.py`, alongside the existing
       `MODE_OPTIONS` re-export, per design.md § DTOs, Story 13 amendment.
+- [x] `commands.py` — **modify** `StartNewSessionCommand.execute`: add
+      required keyword-only parameters `operator: str, mode: str, my_rig:
+      str, tx_pwr: str`; stop constructing `StationDefaults()`; call
+      `LoggingSession.start(QsoTimestamp(qso_date, time_on),
+      operator=operator, mode=mode, my_rig=my_rig, tx_pwr=tx_pwr,
+      my_sig_info=park_reference, freq=freq)` per design.md § Commands
+      (`StartNewSessionCommand` row), Story 6 field-expansion amendment.
+- [x] `dto.py` — **modify**: re-export `StationDefaults` from
+      `domain/logging_session/value_objects.py`, alongside the existing
+      `MODE_OPTIONS`/`default_rst_for_mode` re-exports, per design.md §
+      DTOs, Story 6 field-expansion amendment.
 
 ## Infrastructure Layer
 
@@ -414,6 +481,83 @@ Frontend Design section; this project has no `frontend/src`)
       `values`' length must match `len(_COLUMNS)` for the `enumerate(values)`
       loop's column-aligned `setItem(...)` calls per design.md § Overview
       (Story 16 amendment) and § Components.
+- [x] `session_setup_dialog.py` — **modify** `SessionSetupResult`: add four
+      fields — `operator: str`, `my_rig: str`, `tx_pwr: str`, `mode: str`
+      per design.md § Components, Story 6 field-expansion amendment.
+- [x] `session_setup_dialog.py` — **modify** `SessionSetupDialog.__init__`:
+      import `StationDefaults`/`MODE_OPTIONS` from
+      `application/logging_session/dto.py` and construct `defaults =
+      StationDefaults()`; pre-fill the existing `self._freq` with
+      `defaults.freq` (previously left unset); add `self._operator =
+      QLineEdit()` pre-filled with `defaults.operator` and call
+      `uppercase_as_typed(self._operator)`; add `self._my_rig = QLineEdit()`
+      pre-filled with `defaults.my_rig`; add `self._tx_pwr = QLineEdit()`
+      pre-filled with `defaults.tx_pwr`; add a non-editable `self._mode =
+      QComboBox()` populated via `.addItems(MODE_OPTIONS)` and set via
+      `.setCurrentText(defaults.mode)`; add all four to `form` after the
+      existing four rows, in the order "Operator", "Rig", "TX Power",
+      "Mode" per design.md § Overview (Story 6 field-expansion amendment)
+      and § Components.
+- [x] `session_setup_dialog.py` — **modify** `SessionSetupDialog.__init__`
+      and `_update_ok_enabled`: connect `self._operator.textChanged`,
+      `self._my_rig.textChanged`, and `self._tx_pwr.textChanged` to
+      `_update_ok_enabled`; require `self._operator.text().strip()`,
+      `self._my_rig.text().strip()`, and `self._tx_pwr.text().strip()` to
+      also be non-empty (alongside the existing park-reference/frequency
+      checks) before enabling "OK" — "Mode" needs no check, since a
+      non-editable `QComboBox` can never be empty — per design.md §
+      Overview (Story 6 field-expansion amendment) and § Components.
+- [x] `session_setup_dialog.py` — **modify** `_accept_setup`: populate
+      `SessionSetupResult`'s new `operator`, `my_rig`, `tx_pwr`, `mode`
+      fields from `self._operator.text()`, `self._my_rig.text()`,
+      `self._tx_pwr.text()`, `self._mode.currentText()` per design.md §
+      Components, Story 6 field-expansion amendment.
+- [x] `session_bootstrap.py` — **modify** `bootstrap_session`: pass
+      `operator=setup_dialog.setup_result.operator,
+      mode=setup_dialog.setup_result.mode,
+      my_rig=setup_dialog.setup_result.my_rig,
+      tx_pwr=setup_dialog.setup_result.tx_pwr` as additional keyword
+      arguments to `start_new_session.execute(...)` per design.md § Entry
+      points and § Components, Story 6 field-expansion amendment.
+- [x] `qso_entry_form_widget.py` — **modify** `QsoEntryFormWidget.__init__`:
+      move `self._column_2.addRow("FREQ", self._freq)` /
+      `self._column_2.addRow("MODE", self._mode)` to be followed by a new
+      `self._column_2.addRow("TX_PWR", self._tx_pwr)` (dropping the
+      existing `self._my_sig_info`/`.QSO_DATE` rows from `self._column_2`);
+      change `self._column_3` to add, in order,
+      `self._column_3.addRow("MY_SIG_INFO", self._my_sig_info)`,
+      `self._column_3.addRow("QSO_DATE", self._qso_date)`,
+      `self._column_3.addRow("OPERATOR", self._operator)`,
+      `self._column_3.addRow("MY_RIG", self._my_rig)` (dropping the
+      existing `self._tx_pwr` row from `self._column_3`) per design.md §
+      Overview (Story 12 read-only fields amendment), point 1, and §
+      Components.
+- [x] `qso_entry_form_widget.py` — **modify** `QsoEntryFormWidget.__init__`:
+      right after `self._column_3`'s `addRow(...)` calls, add
+      `self._my_sig_info.setEnabled(False)`,
+      `self._qso_date.setEnabled(False)`,
+      `self._operator.setEnabled(False)`, `self._my_rig.setEnabled(False)`
+      per design.md § Overview (Story 12 read-only fields amendment), point
+      2, and § Components. No change to `apply_defaults()` — its existing
+      `setText()`/`setDate()` calls on these four widgets keep working
+      unmodified.
+- [x] `qso_entry_form_widget.py` — **modify** `QsoEntryFormWidget.__init__`:
+      change the `self._fields` list from its current 11 entries to
+      exactly `[self._call, self._rst_rcvd, self._rst_sent, self._time_on,
+      self._freq, self._mode, self._tx_pwr]` (dropping
+      `self._my_sig_info`, `self._qso_date`, `self._operator`,
+      `self._my_rig`) — this list drives both the `installEventFilter`
+      loop and the `QWidget.setTabOrder(...)` chain built from it, so
+      dropping the four entries there narrows both at once per design.md §
+      Overview (Story 12 read-only fields amendment), point 3, and §
+      Components.
+- [x] `qso_entry_form_widget.py` — **modify** `QsoEntryFormWidget.__init__`:
+      remove the `uppercase_as_typed(self._my_sig_info)` and
+      `uppercase_as_typed(self._operator)` calls (both fields are disabled
+      immediately after construction and can no longer receive typed
+      input on this form); leave `uppercase_as_typed(self._call)`
+      unchanged per design.md § Overview (Story 12 read-only fields
+      amendment), point 4, and § Components.
 
 ## Frontend
 
@@ -740,6 +884,111 @@ N/A — this project has no `frontend/src`; see design.md § API Layer.
       equal `["CALL", "QSO_DATE", "TIME_ON", "RST_RCVD", "RST_SENT",
       "FREQ", "MODE"]` per design.md § Testing Strategy (Story 16
       amendment).
+- [x] `tests/domain/logging_session/test_value_objects.py` — **modify**
+      existing `EntryDefaults.seed(...)` call sites: replace the
+      `StationDefaults(...)` positional argument with explicit
+      `operator=`, `mode=`, `my_rig=`, `tx_pwr=` keyword arguments carrying
+      the same values (`"SM6Y"`, `"CW"`, `"Elecraft KX2"`, `"5"`, or
+      whatever each test's `StationDefaults(...)` override specified), so
+      no test's other assertions change per design.md § Testing Strategy
+      (Story 6 field-expansion amendment).
+- [x] `tests/domain/logging_session/test_value_objects.py` — **add** a
+      test: `EntryDefaults.seed(now, operator="W1AW", mode="SSB",
+      my_rig="FT-891", tx_pwr="10").operator == "W1AW"` and `.mode ==
+      "SSB"` and `.my_rig == "FT-891"` and `.tx_pwr == "10"` and
+      `.rst_sent == "59"` (derived from `mode` via `default_rst_for_mode`)
+      per design.md § Testing Strategy.
+- [x] `tests/domain/logging_session/test_entities.py` — **modify** existing
+      `LoggingSession.start(...)` call sites the same way: replace the
+      `StationDefaults(...)` positional argument with explicit
+      `operator=`/`mode=`/`my_rig=`/`tx_pwr=` keyword arguments carrying
+      the same values per design.md § Testing Strategy (Story 6
+      field-expansion amendment).
+- [x] `tests/application/logging_session/test_commands.py` — **add** a
+      test: `StartNewSessionCommand(...).execute(..., operator="W1AW",
+      mode="SSB", my_rig="FT-891", tx_pwr="10")` — the returned
+      `SessionStartResult.entry_defaults.operator`/`.mode`/`.my_rig`/
+      `.tx_pwr` equal those four values, proving the command no longer
+      falls back to `StationDefaults()`'s fixed constants on its own per
+      design.md § Testing Strategy.
+- [x] `tests/api/test_session_setup_dialog.py` — **add** tests: constructing
+      `SessionSetupDialog` and reading `._freq.text()`, `._operator.text()`,
+      `._my_rig.text()`, `._tx_pwr.text()`, `._mode.currentText()` back
+      equal `StationDefaults()`'s `freq`/`operator`/`my_rig`/`tx_pwr`/
+      `mode`; "OK" stays disabled with the park reference and frequency
+      filled in but operator (or rig, or TX power) left empty, and only
+      enables once all five text fields are non-empty; the "Mode" combo
+      box offers exactly `["CW", "SSB"]` and is not editable per design.md
+      § Testing Strategy.
+- [x] `tests/api/test_session_setup_dialog.py` — **add** a pytest-qt test:
+      typing lowercase text into "Operator" displays it uppercase
+      immediately, the same way the park-reference field already does per
+      design.md § Testing Strategy.
+- [x] `tests/api/test_session_setup_dialog.py` — **modify** the existing
+      "OK" test: extend its `.setup_result` assertion to also check
+      `operator`/`my_rig`/`tx_pwr`/`mode` equal the widgets' current
+      values, alongside the existing `park_reference`/`freq` checks per
+      design.md § Testing Strategy.
+- [x] `tests/api/test_session_bootstrap.py` — **modify**: fake setup-dialog
+      results and `StartNewSessionCommand` assertions gain `operator`/
+      `my_rig`/`tx_pwr`/`mode` values, confirming they flow from the setup
+      dialog into `StartNewSessionCommand.execute(..., operator=...,
+      mode=..., my_rig=..., tx_pwr=...)`, alongside the existing `freq`
+      assertion per design.md § Testing Strategy (Story 6 field-expansion
+      amendment).
+- [x] `tests/api/test_qso_entry_form_widget.py` — **modify** the Story 12
+      column-layout row-label test: change the `widget._column_2` and
+      `widget._column_3` assertions to `["FREQ", "MODE", "TX_PWR"]` and
+      `["MY_SIG_INFO", "QSO_DATE", "OPERATOR", "MY_RIG"]` respectively (the
+      `widget._column_1` assertion, `["CALL", "RST_RCVD", "RST_SENT",
+      "TIME_ON"]`, is unchanged) per design.md § Testing Strategy (Story 12
+      read-only fields, authoritative test paragraph).
+- [x] `tests/api/test_qso_entry_form_widget.py` — **add** a pytest-qt test:
+      after constructing `QsoEntryFormWidget`,
+      `widget._my_sig_info.isEnabled()`, `widget._qso_date.isEnabled()`,
+      `widget._operator.isEnabled()`, and `widget._my_rig.isEnabled()` are
+      all `False`; every other field in `widget._fields`
+      (`self._call, self._rst_rcvd, self._rst_sent, self._time_on,
+      self._freq, self._mode, self._tx_pwr`) has `.isEnabled() == True`
+      per design.md § Testing Strategy (Story 12 read-only fields).
+- [x] `tests/api/test_qso_entry_form_widget.py` — **add** a pytest-qt test:
+      calling `apply_defaults(a_entry_defaults_dto)` sets
+      `widget._my_sig_info.text()`, `widget._qso_date.date()` (converted
+      back to a `date`), `widget._operator.text()`, and
+      `widget._my_rig.text()` to the DTO's corresponding values, despite
+      all four widgets being disabled — proving pre-fill/carry-forward
+      still reaches them per design.md § Testing Strategy (Story 12
+      read-only fields).
+- [x] `tests/api/test_qso_entry_form_widget.py` — **modify** the Story 12
+      Tab-chain test: change the expected `.nextInFocusChain()` sequence
+      from the 11 field widgets to exactly the 7 editable ones, in order
+      — `[widget._call, widget._rst_rcvd, widget._rst_sent,
+      widget._time_on, widget._freq, widget._mode, widget._tx_pwr]` —
+      since Qt's focus chain now skips the 4 disabled widgets
+      automatically per design.md § Testing Strategy (Story 12 read-only
+      fields).
+- [x] `tests/api/test_qso_entry_form_widget.py` — **add** a pytest-qt test:
+      with the form pre-filled via `apply_defaults(...)`, set CALL
+      non-empty and submit (button click or Enter); assert the emitted
+      `SubmitQsoRequest`'s `my_sig_info`, `operator`, and `my_rig` fields
+      match what `apply_defaults()` set, proving `.text()`/`.date()` reads
+      on a disabled widget still return its current value per design.md §
+      Testing Strategy (Story 12 read-only fields).
+- [x] `tests/api/test_qso_entry_form_widget.py` — **remove** the Story 7 and
+      Story 8 live-uppercase tests for MY_SIG_INFO and OPERATOR (typing
+      lowercase into either field and asserting it displays uppercase) —
+      neither field can receive typed input on this form once disabled, so
+      there is no longer a live-uppercase path to test here; the
+      equivalent session-setup-dialog tests (park reference, Operator) in
+      `test_session_setup_dialog.py` are untouched per design.md § Testing
+      Strategy (Story 12 read-only fields).
+- [x] `tests/api/test_qso_entry_form_widget.py` — **modify** the existing
+      Story 11 "Enter in a non-CALL field submits" test: change the field
+      it presses Enter in from `widget._my_rig` to `widget._tx_pwr` — MY_RIG
+      can no longer receive keyboard focus once disabled, so it can no
+      longer be the field under test; the assertion itself (`submitted` is
+      emitted with the expected `SubmitQsoRequest`) is unchanged per
+      design.md § Testing Strategy (Story 12 read-only fields).
 
 ## Task Dependencies
 
@@ -987,3 +1236,73 @@ N/A — this project has no `frontend/src`; see design.md § API Layer.
   `test_qso_list_widget.py` test.
 - Otherwise independent of every other amendment in this file — touches
   only `qso_list_widget.py`.
+
+### Story 6 field-expansion amendment (added after Story 16 was implemented)
+
+- `value_objects.py`'s `StationDefaults.freq` field addition has no
+  dependency on anything new and must land before `session_setup_dialog.py`'s
+  modification (which reads `defaults.freq` to pre-fill the Frequency
+  field) — it has no test of its own, and is exercised indirectly via
+  `test_session_setup_dialog.py`'s pre-fill test.
+- Order: `value_objects.py`'s `EntryDefaults.seed` signature change →
+  `entities.py`'s `LoggingSession.start` signature change (calls `seed`) →
+  `commands.py`'s `StartNewSessionCommand.execute` signature change (calls
+  `start`). Each must land before its own test modifications/additions
+  above — in particular, `test_value_objects.py`'s and
+  `test_entities.py`'s modified call sites depend on the `seed`/`start`
+  signature changes landing first, since the old
+  `StationDefaults(...)`-positional call shape would otherwise still be
+  required.
+- `dto.py`'s `StationDefaults` re-export has no dependency on anything new
+  and must land before `session_setup_dialog.py`'s modification (which
+  imports it from there, not from `domain/` directly).
+- `session_setup_dialog.py`'s three modifications (new fields; OK-enable
+  checks; `_accept_setup` population) depend on `dto.py`'s `StationDefaults`
+  re-export and the already-implemented `dto.py` `MODE_OPTIONS` re-export
+  (Story 9) and `uppercase_field.py` (Story 7); they must land before their
+  own new/modified `test_session_setup_dialog.py` cases.
+- `session_bootstrap.py`'s modification depends on both
+  `session_setup_dialog.py`'s modifications and `commands.py`'s
+  `StartNewSessionCommand.execute` signature change, and must land before
+  `test_session_bootstrap.py`'s modification. It is the last
+  implementation task in this amendment — `main_window.py` and
+  `composition_root.py` need no further changes, since the four new
+  values already flow through `SessionStartResult`/`EntryDefaultsDto`
+  unchanged, the same way FREQ did in the Story 6 Frequency extension.
+- Otherwise independent of every other amendment in this file.
+
+### Story 12 read-only fields amendment (added after the Story 12 column layout amendment was implemented)
+
+- All four `qso_entry_form_widget.py` tasks in this amendment touch the
+  same file and must land in this order: (1) the `addRow(...)` reshuffle
+  between `self._column_2`/`self._column_3`, (2) the four
+  `.setEnabled(False)` calls (reads the widgets the reshuffle just placed
+  in `self._column_3`, though the `addRow` call and the `setEnabled` call
+  are independent of each other in practice — ordering them this way
+  keeps the diff readable, matching design.md's point-by-point ordering),
+  (3) the `self._fields` list narrowing to 7 entries, (4) removing the two
+  now-dead `uppercase_as_typed(...)` calls. Tasks (3) and (4) have no
+  dependency on each other and may be swapped; both depend on (1)/(2)
+  having landed, since they only make sense once the fields they touch are
+  disabled.
+- All four implementation tasks depend on the already-implemented Story 12
+  column-layout amendment (they modify the `self._column_2`/
+  `self._column_3` construction and the `self._fields` list it left
+  behind).
+- Each must land before its own new/modified `test_qso_entry_form_widget.py`
+  test task above — in particular, the column row-label test depends on
+  task (1); the `isEnabled()` test depends on task (2); the
+  `apply_defaults()`-still-reaches-disabled-fields test depends on task
+  (2); the Tab-chain test depends on task (3); the
+  submitted-values-from-disabled-fields test depends on task (2); the
+  removal of the Story 7/8 live-uppercase tests depends on task (4); and
+  the Story 11 non-CALL-field test's field swap (MY_RIG → TX_PWR) depends
+  on task (2) (MY_RIG becomes unfocusable) and task (1) (TX_PWR must
+  already be in `self._column_2`, alongside the other still-editable
+  fields, for the swap to make sense as "a representative non-CALL
+  field").
+- No domain/application/infrastructure task depends on this amendment, and
+  it depends on none of them — purely confined to
+  `qso_entry_form_widget.py` and its own test file, same as the two prior
+  Story 12 amendments.
+- Independent of every other amendment in this file.

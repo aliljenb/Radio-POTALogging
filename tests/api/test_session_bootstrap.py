@@ -47,7 +47,16 @@ class FakeStartNewSessionCommand:
         self.called_with: dict[str, object] | None = None
 
     def execute(
-        self, *, qso_date: date, time_on: time, park_reference: str, freq: str
+        self,
+        *,
+        qso_date: date,
+        time_on: time,
+        park_reference: str,
+        freq: str,
+        operator: str,
+        mode: str,
+        my_rig: str,
+        tx_pwr: str,
     ) -> SessionStartResult:
         self.executed = True
         self.called_with = {
@@ -55,6 +64,10 @@ class FakeStartNewSessionCommand:
             "time_on": time_on,
             "park_reference": park_reference,
             "freq": freq,
+            "operator": operator,
+            "mode": mode,
+            "my_rig": my_rig,
+            "tx_pwr": tx_pwr,
         }
         return SessionStartResult(entry_defaults=_entry_defaults(), qsos=())
 
@@ -62,7 +75,14 @@ class FakeStartNewSessionCommand:
 class _FakeSetupDialogWithResult:
     def __init__(self) -> None:
         self.setup_result: SessionSetupResult | None = SessionSetupResult(
-            park_reference="K-1234", qso_date=date(2026, 8, 30), time_on=time(9, 0), freq="14.062"
+            park_reference="K-1234",
+            qso_date=date(2026, 8, 30),
+            time_on=time(9, 0),
+            freq="14.062",
+            operator="W1AW",
+            my_rig="FT-891",
+            tx_pwr="10",
+            mode="SSB",
         )
 
     def exec(self) -> int:
@@ -108,6 +128,10 @@ def test_no_resumable_session_shows_setup_dialog_and_starts_new_session(
         "time_on": time(9, 0),
         "park_reference": "K-1234",
         "freq": "14.062",
+        "operator": "W1AW",
+        "mode": "SSB",
+        "my_rig": "FT-891",
+        "tx_pwr": "10",
     }
     assert not resume.executed
 
