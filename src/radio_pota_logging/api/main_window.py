@@ -5,6 +5,8 @@ from __future__ import annotations
 from PyQt6.QtWidgets import QApplication, QMainWindow, QPushButton, QVBoxLayout, QWidget
 
 from radio_pota_logging.application.logging_session.commands import (
+    DeleteQsoCommand,
+    EditQsoCommand,
     GenerateAdifCommand,
     SubmitQsoCommand,
 )
@@ -23,6 +25,8 @@ class MainWindow(QMainWindow):
         self,
         initial_result: SessionStartResult,
         submit_qso: SubmitQsoCommand,
+        edit_qso: EditQsoCommand,
+        delete_qso: DeleteQsoCommand,
         generate_adif: GenerateAdifCommand,
         suggest_adif_filename: SuggestAdifFilenameQuery,
     ) -> None:
@@ -37,6 +41,8 @@ class MainWindow(QMainWindow):
             form=self.form,
             qso_list=self.qso_list,
             submit_command=submit_qso,
+            edit_command=edit_qso,
+            delete_command=delete_qso,
             generate_adif_command=generate_adif,
             suggest_adif_filename_command=suggest_adif_filename,
             dialog_parent=self,

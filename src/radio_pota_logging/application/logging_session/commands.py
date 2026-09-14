@@ -25,6 +25,9 @@ from radio_pota_logging.domain.logging_session.value_objects import (
 
 from .dto import (
     AdifExportResult,
+    DeleteQsoRequest,
+    EditQsoRequest,
+    EditQsoResult,
     EntryDefaultsDto,
     QsoDto,
     SessionStartResult,
@@ -148,6 +151,36 @@ class SubmitQsoCommand:
             entry_defaults=_to_entry_defaults_dto(session.next_entry_defaults),
             submitted=_to_qso_dto(qso),
         )
+
+
+@dataclass(frozen=True)
+class EditQsoCommand:
+    repository: LoggingSessionRepository
+
+    def execute(self, request: EditQsoRequest) -> EditQsoResult:
+        session = _require_current_session(self.repository)
+        qso = session.edit_qso(
+            request.index,
+            call=request.call,
+            qso_date=request.qso_date,
+            time_on=request.time_on,
+            mode=request.mode,
+            rst_sent=request.rst_sent,
+            rst_rcvd=request.rst_rcvd,
+            freq=request.freq,
+        )
+        self.repository.save(session)
+        return EditQsoResult(qso=_to_qso_dto(qso))
+
+
+@dataclass(frozen=True)
+class DeleteQsoCommand:
+    repository: LoggingSessionRepository
+
+    def execute(self, request: DeleteQsoRequest) -> None:
+        session = _require_current_session(self.repository)
+        session.delete_qso(request.index)
+        self.repository.save(session)
 
 
 @dataclass(frozen=True)

@@ -16,6 +16,16 @@ class FakeSubmitQsoCommand:
         raise NotImplementedError
 
 
+class FakeEditQsoCommand:
+    def execute(self, request: object) -> object:  # pragma: no cover - unused here
+        raise NotImplementedError
+
+
+class FakeDeleteQsoCommand:
+    def execute(self, request: object) -> None:  # pragma: no cover - unused here
+        raise NotImplementedError
+
+
 class FakeGenerateAdifCommand:
     def execute(self, destination: Path) -> None:  # pragma: no cover - unused here
         raise NotImplementedError
@@ -66,6 +76,8 @@ def test_main_window_renders_the_given_session_start_result(qtbot: QtBot) -> Non
     window = MainWindow(
         initial_result=initial_result,
         submit_qso=FakeSubmitQsoCommand(),  # type: ignore[arg-type]
+        edit_qso=FakeEditQsoCommand(),  # type: ignore[arg-type]
+        delete_qso=FakeDeleteQsoCommand(),  # type: ignore[arg-type]
         generate_adif=FakeGenerateAdifCommand(),  # type: ignore[arg-type]
         suggest_adif_filename=FakeSuggestAdifFilenameQuery(),  # type: ignore[arg-type]
     )
@@ -81,6 +93,8 @@ def test_main_window_renders_an_empty_qso_list_for_a_brand_new_session(qtbot: Qt
     window = MainWindow(
         initial_result=initial_result,
         submit_qso=FakeSubmitQsoCommand(),  # type: ignore[arg-type]
+        edit_qso=FakeEditQsoCommand(),  # type: ignore[arg-type]
+        delete_qso=FakeDeleteQsoCommand(),  # type: ignore[arg-type]
         generate_adif=FakeGenerateAdifCommand(),  # type: ignore[arg-type]
         suggest_adif_filename=FakeSuggestAdifFilenameQuery(),  # type: ignore[arg-type]
     )
@@ -95,6 +109,8 @@ def test_main_window_sizes_itself_to_half_width_and_three_quarters_height(qtbot:
     window = MainWindow(
         initial_result=initial_result,
         submit_qso=FakeSubmitQsoCommand(),  # type: ignore[arg-type]
+        edit_qso=FakeEditQsoCommand(),  # type: ignore[arg-type]
+        delete_qso=FakeDeleteQsoCommand(),  # type: ignore[arg-type]
         generate_adif=FakeGenerateAdifCommand(),  # type: ignore[arg-type]
         suggest_adif_filename=FakeSuggestAdifFilenameQuery(),  # type: ignore[arg-type]
     )

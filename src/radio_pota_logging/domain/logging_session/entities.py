@@ -111,3 +111,45 @@ class LoggingSession:
             timestamp=timestamp.plus_two_minutes(),
         )
         return qso
+
+    def edit_qso(
+        self,
+        index: int,
+        *,
+        call: str,
+        qso_date: date,
+        time_on: time,
+        mode: str,
+        rst_sent: str,
+        rst_rcvd: str,
+        freq: str,
+    ) -> Qso:
+        """Revalidate and replace the QSO at `index` in place; leave
+        next_entry_defaults untouched."""
+        existing = self.qsos[index]
+        frequency = Frequency.parse(freq)
+        _ = frequency.band  # raises FrequencyOutOfBandError before any state changes
+
+        timestamp = QsoTimestamp(qso_date=qso_date, time_on=time_on)
+        edited = Qso(
+            call=call,
+            timestamp=timestamp,
+            mode=mode,
+            my_sig=existing.my_sig,
+            my_sig_info=existing.my_sig_info,
+            rst_sent=rst_sent,
+            rst_rcvd=rst_rcvd,
+            freq=frequency,
+            operator=existing.operator,
+            my_rig=existing.my_rig,
+            tx_pwr=existing.tx_pwr,
+        )
+
+        self.qsos = (*self.qsos[:index], edited, *self.qsos[index + 1 :])
+        return edited
+
+    def delete_qso(self, index: int) -> None:
+        """Remove the QSO at `index` outright; leave next_entry_defaults untouched."""
+        qsos = list(self.qsos)
+        del qsos[index]  # raises IndexError for an out-of-range index
+        self.qsos = tuple(qsos)

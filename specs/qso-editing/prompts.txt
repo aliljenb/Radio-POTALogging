@@ -1,0 +1,6 @@
+## Main QSO dialog
+As an operator, I want to be able to edit any field by double-clicking it and change the content.
+------------------------------
+## Main QSO dialog
+As an operator, I want to be able to select an entire row, right-click on it and have the option to delete the row.
+------------------------------
