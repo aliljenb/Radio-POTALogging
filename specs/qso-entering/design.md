@@ -26,6 +26,23 @@ to requirements.md's matching "Open questions" entry — see the amendment
 under Overview below. Ready for a `/spec-tasks qso-entering` follow-up
 pass._
 
+_Story 12 changed again 2026-09-14 (requirements.md, approved): the 4
+column-3 fields (MY_SIG_INFO, QSO_DATE, OPERATOR, MY_RIG) stop being
+disabled `QLineEdit`/`QDateEdit` widgets and become a single `QLabel` each,
+displaying the combined text "FIELD_NAME: value" (e.g. "MY_SIG_INFO:
+SE-0072"). Drafted and approved 2026-09-14 in response to requirements.md's
+matching "Open questions" entry — see the amendment under Overview below.
+Ready for a `/spec-tasks qso-entering` follow-up pass._
+
+_Story 12 changed again 2026-09-14 (requirements.md, approved a third time):
+within each of the same 4 labels, the value portion is now bold while the
+"FIELD_NAME: " portion stays normal weight. Drafted and approved 2026-09-14
+in response to requirements.md's matching "Open questions" entry — chosen
+mechanism is rich-text `QLabel`s (`Qt.TextFormat.RichText` +
+`<b>...</b>`), over splitting each row into two widgets — see the
+amendment under Overview below. Ready for a `/spec-tasks qso-entering`
+follow-up pass._
+
 ## Overview
 
 A single-operator PyQt desktop application built around one aggregate,
@@ -573,6 +590,180 @@ the two earlier Story 12 amendments (reordering, then column grouping):
    *reads* — so the submitted QSO still carries whatever value
    `apply_defaults()` last set, exactly as before.
 
+**Amendment (Story 12 text-label fields, added after the Story 12 read-only
+amendment)**: the four column-3 fields (MY_SIG_INFO, QSO_DATE, OPERATOR,
+MY_RIG) stop being disabled `QLineEdit`/`QDateEdit` widgets and become a
+single `QLabel` each, displaying the field's name and current value as one
+piece of static text — `"MY_SIG_INFO: SE-0072"`, `"QSO_DATE: 2026-09-07"`,
+`"OPERATOR: SM6Y"`, `"MY_RIG: Elecraft KX2"` — per requirements.md's
+2026-09-14 Story 12 update. This is again a pure API-layer change, confined
+to `QsoEntryFormWidget`:
+
+1. **Widget construction swaps type.** `self._my_sig_info = QLineEdit()`
+   and `self._operator = QLineEdit()` become `self._my_sig_info = QLabel()`
+   and `self._operator = QLabel()`; `self._qso_date = QDateEdit()` (plus its
+   `.setCalendarPopup(True)` call, now meaningless on a label) becomes
+   `self._qso_date = QLabel()`; `self._my_rig = QLineEdit()` becomes
+   `self._my_rig = QLabel()`. Keeping the same four attribute names (rather
+   than introducing new ones) means every other reference to them in this
+   class — there are none left after point 3 below — would have needed no
+   further change; the names now simply denote "the widget that displays
+   this field," consistent with every other field in the class.
+2. **`addRow(...)` calls drop their label argument.** Column 3's four rows
+   move from the two-argument `addRow("MY_SIG_INFO", self._my_sig_info)`
+   form (a `QFormLayout.ItemRole.LabelRole` cell plus a field cell) to the
+   single-argument `addRow(self._my_sig_info)` form, which Qt renders as one
+   widget spanning the full row width with no separate label cell — the
+   field's own text already states its name, so a second, redundant
+   `QFormLayout` label would duplicate it. Columns 1 and 2 are unaffected;
+   only the four column-3 rows change.
+3. **The four `setEnabled(False)` calls are removed.** They applied only to
+   `self._my_sig_info`/`self._qso_date`/`self._operator`/`self._my_rig`, and
+   a `QLabel` is not an input widget in the first place — it never accepts
+   keyboard focus or typed input, so there is nothing left to disable, and
+   requirements.md's 2026-09-14 update explicitly rules out any
+   disabled/grayed-out *input-widget* styling for these four fields (they
+   render with the same plain-text appearance as any other `QLabel`, e.g.
+   `self._error_label`, not a grayed-out control). This also means these
+   four widgets were never candidates for `self._fields` (the Tab-order/
+   Enter-to-submit list) or `installEventFilter`/`setTabOrder(...)` in the
+   first place — the prior Story 12 amendment already dropped them from
+   those lists because a disabled widget is skipped; now they are dropped
+   for the more fundamental reason that a `QLabel` was never part of Qt's
+   focus chain to begin with. No further change is needed to
+   `self._fields`, `installEventFilter`, or `setTabOrder(...)` beyond what
+   the prior amendment already did.
+4. **`apply_defaults()` formats text instead of setting widget state**, and
+   stores the applied `EntryDefaultsDto` for submit-time reads (point 5).
+   The four lines change from
+   `self._my_sig_info.setText(defaults.my_sig_info)`,
+   `self._qso_date.setDate(_to_qdate(defaults.qso_date))`,
+   `self._operator.setText(defaults.operator)`, and
+   `self._my_rig.setText(defaults.my_rig)` to:
+
+   ```
+   self._entry_defaults = defaults
+   self._my_sig_info.setText(f"MY_SIG_INFO: {defaults.my_sig_info}")
+   self._qso_date.setText(f"QSO_DATE: {defaults.qso_date.isoformat()}")
+   self._operator.setText(f"OPERATOR: {defaults.operator}")
+   self._my_rig.setText(f"MY_RIG: {defaults.my_rig}")
+   ```
+
+   `date.isoformat()` produces exactly `"2026-09-07"`-style text, matching
+   requirements.md's example and needing no separate formatting helper.
+   QSO_DATE's midnight-rollover behavior (Story 2) needs no new code here:
+   `LoggingSession.record_qso` already computes the rolled-over date into
+   the `EntryDefaultsDto` passed to the *next* `apply_defaults()` call, so
+   the label simply displays whatever date it's given, exactly as the old
+   `setDate(...)` call did — "the system keeps maintaining the value, the
+   operator just can't type into it" (requirements Story 12's explicit
+   criterion) holds without any story-specific rollover code in the widget,
+   same as before this amendment.
+5. **`self._entry_defaults: EntryDefaultsDto | None = None`, a new instance
+   attribute initialized in `__init__`, becomes the source of truth for
+   MY_SIG_INFO/QSO_DATE/OPERATOR/MY_RIG at submit time**, replacing the
+   `.text()`/`.date()` reads `_on_submit_clicked()` used to make against
+   those four widgets. A `QLabel`'s `.text()` now holds the *formatted*
+   `"FIELD_NAME: value"` string, not the bare value — parsing that string
+   back apart at submit time (splitting on `": "`) would be fragile (a
+   future MY_RIG value containing a colon would silently corrupt the
+   split) and duplicates data that `apply_defaults()` already received
+   verbatim. Storing the whole `EntryDefaultsDto` instead means
+   `_on_submit_clicked()` reads `self._entry_defaults.my_sig_info`,
+   `self._entry_defaults.qso_date` (already a `date`, so the old
+   `date(qso_date_value.year(), ...)` reconstruction from a `QDate` is no
+   longer needed either), `self._entry_defaults.operator`, and
+   `self._entry_defaults.my_rig` — an `assert self._entry_defaults is not
+   None` guard at the top of `_on_submit_clicked()` documents and enforces
+   the invariant that `apply_defaults()` always runs at least once before
+   the operator can reach Submit (every startup path — first entry, resume,
+   or next-entry pre-fill — calls it before the form becomes interactive;
+   the same invariant `self._rst_sent_default`/`self._rst_rcvd_default`
+   already rely on, there via an `is None` early-return instead of an
+   `assert` since `_on_mode_changed` can fire during construction, before
+   `_on_submit_clicked` ever could). Every other field (CALL, RST_RCVD,
+   RST_SENT, TIME_ON, FREQ, MODE, TX_PWR) keeps reading from its own live
+   widget, unaffected.
+6. **`_to_qdate()` is deleted** — it existed solely to convert an
+   `EntryDefaultsDto.qso_date` into a `QDate` for `self._qso_date.setDate(...)`,
+   and nothing else in the codebase calls it (confirmed: its only two
+   references were its own definition and the now-removed `setDate(...)`
+   call). `_to_qtime()` is unaffected — TIME_ON stays a `QTimeEdit`. The
+   `QDateEdit`/`QDate` imports become unused and are removed from
+   `qso_entry_form_widget.py`; the `date` import from `datetime` also
+   becomes unused (its only use was the deleted
+   `date(qso_date_value.year(), ...)` reconstruction) and is removed,
+   leaving `from datetime import time` for TIME_ON's construction.
+7. **No domain/application change** — same as every prior Story 12
+   amendment.
+
+**Amendment (Story 12 bold-value labels, added after the Story 12
+text-label fields amendment)**: within each of the four column-3 labels,
+only the value portion renders bold — "MY_SIG_INFO: **SE-0072**" — while
+the field-name-and-colon prefix ("MY_SIG_INFO: ") stays normal weight, per
+requirements.md's 2026-09-14 Story 12 update. Qt's `QLabel` has no
+per-substring font API on plain text, so this requires rich text; the
+chosen mechanism (over splitting each row into two `QLabel`s — a
+normal-weight name label plus a bold-weight value label in a
+`QHBoxLayout`) is a single rich-text `QLabel` per field, keeping the widget
+count, `addRow(widget)` calls, and `self._my_sig_info`/`self._qso_date`/
+`self._operator`/`self._my_rig` attribute shape exactly as the prior
+amendment left them — this amendment only changes what text each label is
+given and how it's interpreted. Confined entirely to
+`QsoEntryFormWidget.__init__` and `apply_defaults()`:
+
+1. **Each of the four labels is forced into rich-text mode.** Right after
+   `self._my_sig_info = QLabel()` (and the matching lines for
+   `self._qso_date`/`self._operator`/`self._my_rig`), a
+   `.setTextFormat(Qt.TextFormat.RichText)` call is added. `QLabel`'s
+   default, `Qt.TextFormat.AutoText`, guesses whether a string is HTML by
+   pattern-matching it — a value containing something that merely looks
+   like a tag (e.g. an operator-typed rig name with a stray `<`) could
+   flip the guess unpredictably even before this amendment intentionally
+   adds real markup; forcing `RichText` explicitly makes "this label's
+   text is always HTML" a stated fact of the code, not a per-value guess,
+   the same "don't rely on implicit Qt behavior" reasoning every prior
+   Story 12 amendment already used for Tab order.
+2. **A new module-level helper, `_format_field_label(name: str, value:
+   str) -> str`, replaces the plain f-string previously inlined four times
+   in `apply_defaults()`.** It returns
+   `f"{name}: <b>{html.escape(value)}</b>"`. `html.escape()` (Python's
+   standard library, no new dependency) is required, not optional: these
+   four values are operator-typed text carried through from the
+   session-setup dialog (`SessionSetupDialog`'s park reference/Operator/
+   Rig fields, Story 6) or the fixed QSO_DATE format (Story 12's original
+   text-label amendment already guarantees plain digits/dashes for
+   QSO_DATE specifically, but the helper applies `html.escape()`
+   uniformly rather than special-casing which of the four fields "happens"
+   to be safe today) — an unescaped `&`/`<`/`>` in a value would otherwise
+   either corrupt the rendered markup or, worse, be silently swallowed by
+   Qt's HTML parser as an unclosed/invalid tag. One helper function used
+   four times avoids repeating the same `f"{name}: <b>{html.escape(...)}</b>"`
+   shape (and the easy mistake of forgetting `html.escape()` on one of the
+   four call sites) — matching the same "extract the third repetition"
+   reasoning the Story 7 amendment gave for introducing
+   `uppercase_field.uppercase_as_typed()`.
+3. **`apply_defaults()`'s four `.setText(f"...")` calls switch to
+   `_format_field_label(...)`.** `self._my_sig_info.setText(f"MY_SIG_INFO:
+   {defaults.my_sig_info}")` becomes
+   `self._my_sig_info.setText(_format_field_label("MY_SIG_INFO",
+   defaults.my_sig_info))`; `self._qso_date.setText(f"QSO_DATE:
+   {defaults.qso_date.isoformat()}")` becomes
+   `self._qso_date.setText(_format_field_label("QSO_DATE",
+   defaults.qso_date.isoformat()))`; `self._operator`/`self._my_rig`
+   follow the identical pattern with `"OPERATOR"`/`"MY_RIG"`. No other line
+   in `apply_defaults()` changes.
+4. **`_on_submit_clicked()` needs no change.** It already reads
+   MY_SIG_INFO/QSO_DATE/OPERATOR/MY_RIG's submitted values from
+   `self._entry_defaults` (the stored `EntryDefaultsDto`), not by parsing
+   any widget's `.text()` — a decision the prior Story 12 text-label-fields
+   amendment made specifically to avoid depending on a label's displayed
+   string shape, which is exactly what pays off here: this amendment can
+   change that displayed string's markup with zero risk to what gets
+   submitted.
+5. **No domain/application change** — this is a UI-only rendering change,
+   same as every prior Story 12 amendment.
+
 ## Domain Model
 
 > Pure business logic. Zero framework/infra imports. Lives under
@@ -764,7 +955,7 @@ satisfying "without discarding the previous session's persisted file."
 | `SessionSetupDialog` | Collect the park reference, date, start time, starting frequency, operator, rig, TX power, and mode for a new session, or report that the operator chose to quit; pre-fill frequency/operator/rig/TX power/mode from `StationDefaults()`; disable "OK" while the park reference, frequency, operator, rig, or TX power is empty; uppercase the park reference and operator live as typed via `uppercase_as_typed()` (Story 7, Story 8); its "Time of first QSO" `QTimeEdit` uses `setDisplayFormat("HH:mm")`, hiding seconds entry (Story 14); its "Mode" field is the same non-editable `QComboBox` populated from `MODE_OPTIONS` as the main entry form's MODE field (Story 6, extended by the Story 6 field-expansion amendment) | `StationDefaults`, `MODE_OPTIONS` (both re-exported from `application/logging_session/dto.py`, read-only, for its own field pre-fill/population); exposes `.setup_result: SessionSetupResult \| None` after `.exec()` — named to avoid shadowing `QDialog`'s own `.result()` method, the same reason `SessionResumePromptDialog` uses `.choice` |
 | `session_bootstrap.bootstrap_session()` | Run the startup sequence (resume prompt if applicable, then either resume or the setup dialog + `StartNewSessionCommand`) and decide whether the app should proceed at all | `CheckForResumableSessionQuery`, `ResumeSessionCommand`, `StartNewSessionCommand`; shows `SessionResumePromptDialog`/`SessionSetupDialog` |
 | `uppercase_field.uppercase_as_typed(line_edit)` | Make one `QLineEdit` uppercase its text live as the operator types, preserving cursor position (Story 5/7) | none (pure Qt helper; called once per field during widget `__init__`) |
-| `QsoEntryFormWidget` | Render the 11 entry fields in 3 columns — column 1: CALL, RST_RCVD, RST_SENT, TIME_ON; column 2: FREQ, MODE, TX_PWR; column 3 (all read-only): MY_SIG_INFO, QSO_DATE, OPERATOR, MY_RIG (Story 12) — and emit the submitted values; apply a new `EntryDefaultsDto` to pre-fill itself (including the 4 read-only fields, via plain `setText()`/`setDate()`, which work regardless of `setEnabled(False)`) and focus CALL; uppercase CALL live as the operator types, via `uppercase_as_typed()` (requirements Story 5; MY_SIG_INFO and OPERATOR no longer use this on the entry form, since Story 12 made both read-only there); render MODE as a non-editable `QComboBox` populated from `MODE_OPTIONS`, defaulting to "CW" (Story 9); update RST_SENT/RST_RCVD to the new MODE's default when MODE changes, for each field not already edited away from its previous default (Story 13); submit on Enter/Return from any of the 7 editable fields when CALL is non-empty, via an `eventFilter` installed on those 7 only (Story 11, narrowed by Story 12's read-only amendment); its TIME_ON `QTimeEdit` uses `setDisplayFormat("HH:mm")`, hiding seconds entry (Story 14); Tab through only the 7 editable fields, column-major, via an explicit `setTabOrder()` chain that omits the 4 disabled fields entirely — `setEnabled(False)` already makes Qt skip a disabled widget during focus traversal, so this is belt-and-braces, matching the same "don't rely on implicit Qt behavior" reasoning the original Tab-order amendment gave (Story 12); render MY_SIG_INFO, QSO_DATE, OPERATOR, and MY_RIG `setEnabled(False)` — the platform's standard grayed-out disabled style, rejecting operator input while still receiving `apply_defaults()`'s programmatic updates, including QSO_DATE's automatic midnight-rollover advance (Story 12) | emits `SubmitQsoRequest` via a Qt signal |
+| `QsoEntryFormWidget` | Render the 11 entry fields in 3 columns — column 1: CALL, RST_RCVD, RST_SENT, TIME_ON; column 2: FREQ, MODE, TX_PWR; column 3: MY_SIG_INFO, QSO_DATE, OPERATOR, MY_RIG, each a single rich-text `QLabel` reading "FIELD_NAME: **value**" with only the value bolded (Story 12) — and emit the submitted values; apply a new `EntryDefaultsDto` to pre-fill itself (formatting the 4 column-3 labels' text via `_format_field_label()`, which HTML-escapes the value and wraps it in `<b>...</b>`, and storing the DTO itself as `self._entry_defaults` for those 4 fields' submit-time reads, since a `QLabel` holds no separate typed value) and focus CALL; uppercase CALL live as the operator types, via `uppercase_as_typed()` (requirements Story 5; MY_SIG_INFO and OPERATOR no longer use this on the entry form, since Story 12 shows both as static text labels there); render MODE as a non-editable `QComboBox` populated from `MODE_OPTIONS`, defaulting to "CW" (Story 9); update RST_SENT/RST_RCVD to the new MODE's default when MODE changes, for each field not already edited away from its previous default (Story 13); submit on Enter/Return from any of the 7 editable fields when CALL is non-empty, via an `eventFilter` installed on those 7 only (Story 11, narrowed by Story 12's read-only amendment); its TIME_ON `QTimeEdit` uses `setDisplayFormat("HH:mm")`, hiding seconds entry (Story 14); Tab through only the 7 editable fields, column-major, via an explicit `setTabOrder()` chain that omits MY_SIG_INFO/QSO_DATE/OPERATOR/MY_RIG entirely — those 4 are plain `QLabel`s with no input mechanism to receive focus in the first place, so this is belt-and-braces, matching the same "don't rely on implicit Qt behavior" reasoning the original Tab-order amendment gave (Story 12) | emits `SubmitQsoRequest` via a Qt signal |
 | `QsoListWidget` | Display submitted QSOs, in order, read-only, with alternating row background colors from the system palette (Story 15), showing only the 7 columns CALL, QSO_DATE, TIME_ON, RST_RCVD, RST_SENT, FREQ, MODE (Story 16) | renders `QsoDto` rows appended to it |
 | `QsoEntryController` | Wire widget signals to application commands/queries and route results/errors back to the widgets | `SubmitQsoCommand`, `GenerateAdifCommand` |
 | `composition_root.py` (`main`) | Construct the concrete adapters, run `bootstrap_session()`, and — only if it returns a result rather than `None` — construct/show `MainWindow` and run the Qt event loop | — |
@@ -1009,6 +1200,61 @@ Mirrors `src/` under `tests/`.
   MY_SIG_INFO and OPERATOR (see the GUI bullet above) are **removed**, not
   just modified — there is no longer any typed-input path into either
   field on this form to test.
+- Story 12 text-label fields (authoritative — supersedes the Story 12
+  read-only fields paragraph above for `widget._column_3`'s row-label and
+  `.isEnabled()` assertions): `widget._column_3` no longer has a
+  `QFormLayout.ItemRole.LabelRole` widget for any of its 4 rows (each was
+  added via the single-argument `addRow(widget)` overload), so the
+  row-label-text assertion for column 3 is **removed**; in its place,
+  after `apply_defaults(...)` is called with representative values (the
+  same examples requirements.md's Story 12 note uses),
+  `widget._my_sig_info.text() == "MY_SIG_INFO: SE-0072"`,
+  `widget._qso_date.text() == "QSO_DATE: 2026-09-07"`,
+  `widget._operator.text() == "OPERATOR: SM6Y"`, and
+  `widget._my_rig.text() == "MY_RIG: Elecraft KX2"`; `widget._column_1`'s
+  and `widget._column_2`'s row-label-text assertions (`["CALL",
+  "RST_RCVD", "RST_SENT", "TIME_ON"]` and `["FREQ", "MODE", "TX_PWR"]`) are
+  unaffected. The `.isEnabled()` assertions for the 4 column-3 widgets are
+  **removed**, not modified — a `QLabel` has no enabled/disabled styling
+  relevant to this story, since the whole point of this amendment is that
+  they are no longer input widgets to begin with. Submitting the form
+  (with CALL non-empty) still emits a `SubmitQsoRequest` whose
+  `my_sig_info`, `qso_date`, `operator`, and `my_rig` match the values from
+  the most recent `apply_defaults(...)` call — **modified** from the prior
+  paragraph's version of this assertion, since it now proves
+  `_on_submit_clicked()` sources those 4 fields from `self._entry_defaults`
+  (the stored DTO) rather than reading `.text()`/`.date()` back off the
+  widgets, which now hold only the formatted display string. The Tab-chain
+  assertion (walking `.nextInFocusChain()` from `widget._call`, expecting
+  only the 7 editable fields) is unaffected in its expected order, but its
+  rationale changes: a `QLabel` was never part of Qt's focus chain to
+  begin with (unlike a disabled `QLineEdit`/`QDateEdit`, which merely opts
+  out via `setEnabled(False)`), so this test now documents an invariant of
+  the widget type itself.
+- Story 12 bold-value labels (authoritative — supersedes the Story 12
+  text-label fields paragraph above's four `widget._my_sig_info.text() ==
+  "MY_SIG_INFO: SE-0072"`-style assertions): after `apply_defaults(...)` is
+  called with the same representative values, `widget._my_sig_info.text()
+  == "MY_SIG_INFO: <b>SE-0072</b>"`, `widget._qso_date.text() == "QSO_DATE:
+  <b>2026-09-07</b>"`, `widget._operator.text() == "OPERATOR:
+  <b>SM6Y</b>"`, and `widget._my_rig.text() == "MY_RIG: <b>Elecraft
+  KX2</b>"` — proving only the value is wrapped in `<b>...</b>`, not the
+  field-name prefix; each of the four widgets'
+  `.textFormat() == Qt.TextFormat.RichText`, proving the format is forced
+  rather than left to `QLabel`'s default auto-detection. A new,
+  **dedicated** test covers the `html.escape()` requirement directly:
+  `apply_defaults(...)` with `my_sig_info` (or any of the other three)
+  containing `<`/`&`/`>` (e.g. `"K-1234 & Co"`) results in
+  `widget._my_sig_info.text() == "MY_SIG_INFO: <b>K-1234 &amp; Co</b>"` —
+  proving a value containing HTML-special characters is escaped, not
+  rendered as markup or dropped. Submitting the form still emits a
+  `SubmitQsoRequest` whose `my_sig_info`/`qso_date`/`operator`/`my_rig`
+  equal the *unescaped, unmarked-up* values from the most recent
+  `apply_defaults(...)` call, unchanged from the Story 12 text-label fields
+  paragraph's version of this assertion — this amendment only touches what
+  `self._my_sig_info` (etc.) *displays*, never what
+  `self._entry_defaults` holds or what `_on_submit_clicked()` reads from
+  it.
 - Story 6 field expansion: **domain** —
   `EntryDefaults.seed(now, operator="SM6Y", mode="CW", my_rig="Elecraft KX2",
   tx_pwr="5")` (no `my_sig_info`/`freq`) returns the same field values the
@@ -1043,6 +1289,42 @@ Mirrors `src/` under `tests/`.
   `freq` assertion from the earlier Story 6 extension.
 
 ## Open Questions / Risks
+
+**Approved 2026-09-14 (bold-value labels).** requirements.md's Story 12
+bold-value change (2026-09-14) resolves its matching "Open questions"
+entry by choosing between the two options it posed: a single rich-text
+`QLabel` per field (`Qt.TextFormat.RichText` + a `<b>...</b>` span around
+the value), over splitting each row into two separate `QLabel`s (a
+normal-weight name label plus a bold-weight value label). The user chose
+rich text explicitly when asked. Given that choice, the remaining
+implementation details have one reasonable shape each: forcing
+`Qt.TextFormat.RichText` (rather than leaving `QLabel`'s default
+`AutoText` to guess) avoids a value that merely resembles HTML from
+flipping the guess unpredictably — the same "state it explicitly, don't
+rely on Qt's implicit behavior" reasoning already used for Tab order and
+this label's own rich-text-ness once markup is involved at all; and
+`html.escape()`-ing the value before interpolating it into the `<b>...</b>`
+span is not optional once the text is being rendered as HTML — an
+operator-typed value containing `<`/`&`/`>` would otherwise corrupt the
+markup or be silently dropped by Qt's HTML parser. No other open question
+remains for this amendment.
+
+**Approved 2026-09-14.** requirements.md's Story 12 text-label change
+(2026-09-14) resolves its matching "Open questions" entry — the exact
+Qt mechanism was the only real decision, and it has one reasonable shape:
+`QFormLayout.addRow(widget)`'s single-argument overload is the built-in Qt
+way to render one widget spanning a form row with no separate label cell,
+which is exactly what a self-describing "FIELD_NAME: value" `QLabel` needs
+— there's no reason to keep the old two-argument `addRow(label, widget)`
+row shape once the label text is redundant with the widget's own content.
+The one genuine design decision — how `_on_submit_clicked()` recovers
+MY_SIG_INFO/QSO_DATE/OPERATOR/MY_RIG's values now that their widgets hold
+only formatted display text, not the raw value — is resolved in favor of
+storing the applied `EntryDefaultsDto` itself (`self._entry_defaults`)
+rather than parsing the label text back apart; parsing would be fragile
+(a value containing `": "` would corrupt the split) for no benefit, since
+`apply_defaults()` already has the raw values on hand. No other open
+question remains for this amendment.
 
 **Approved 2026-09-07.** requirements.md's Story 12
 read-only-fields change (2026-09-07) has one reasonable shape:

@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from datetime import date, time
+import html
+from datetime import time
 from typing import cast
 
-from PyQt6.QtCore import QDate, QEvent, QObject, Qt, QTime, pyqtSignal
+from PyQt6.QtCore import QEvent, QObject, Qt, QTime, pyqtSignal
 from PyQt6.QtGui import QKeyEvent
 from PyQt6.QtWidgets import (
     QComboBox,
-    QDateEdit,
     QFormLayout,
     QHBoxLayout,
     QLabel,
@@ -44,17 +44,21 @@ class QsoEntryFormWidget(QWidget):
         self._rst_sent = QLineEdit()
         self._rst_sent_default: str | None = None
         self._rst_rcvd_default: str | None = None
+        self._entry_defaults: EntryDefaultsDto | None = None
         self._time_on = QTimeEdit()
         self._time_on.setDisplayFormat("HH:mm")
         self._freq = QLineEdit()
-        self._my_sig_info = QLineEdit()
-        self._qso_date = QDateEdit()
-        self._qso_date.setCalendarPopup(True)
+        self._my_sig_info = QLabel()
+        self._my_sig_info.setTextFormat(Qt.TextFormat.RichText)
+        self._qso_date = QLabel()
+        self._qso_date.setTextFormat(Qt.TextFormat.RichText)
         self._mode = QComboBox()
         self._mode.addItems(MODE_OPTIONS)
         self._mode.currentTextChanged.connect(self._on_mode_changed)
-        self._operator = QLineEdit()
-        self._my_rig = QLineEdit()
+        self._operator = QLabel()
+        self._operator.setTextFormat(Qt.TextFormat.RichText)
+        self._my_rig = QLabel()
+        self._my_rig.setTextFormat(Qt.TextFormat.RichText)
         self._tx_pwr = QLineEdit()
         self._error_label = QLabel()
         self._error_label.setStyleSheet("color: red;")
@@ -72,14 +76,10 @@ class QsoEntryFormWidget(QWidget):
         self._column_2.addRow("TX_PWR", self._tx_pwr)
 
         self._column_3 = QFormLayout()
-        self._column_3.addRow("MY_SIG_INFO", self._my_sig_info)
-        self._column_3.addRow("QSO_DATE", self._qso_date)
-        self._column_3.addRow("OPERATOR", self._operator)
-        self._column_3.addRow("MY_RIG", self._my_rig)
-        self._my_sig_info.setEnabled(False)
-        self._qso_date.setEnabled(False)
-        self._operator.setEnabled(False)
-        self._my_rig.setEnabled(False)
+        self._column_3.addRow(self._my_sig_info)
+        self._column_3.addRow(self._qso_date)
+        self._column_3.addRow(self._operator)
+        self._column_3.addRow(self._my_rig)
 
         columns_layout = QHBoxLayout()
         columns_layout.addLayout(self._column_1)
@@ -110,18 +110,19 @@ class QsoEntryFormWidget(QWidget):
             QWidget.setTabOrder(earlier, later)
 
     def apply_defaults(self, defaults: EntryDefaultsDto) -> None:
+        self._entry_defaults = defaults
         self._call.clear()
-        self._qso_date.setDate(_to_qdate(defaults.qso_date))
+        self._qso_date.setText(_format_field_label("QSO_DATE", defaults.qso_date.isoformat()))
         self._time_on.setTime(_to_qtime(defaults.time_on))
         self._mode.setCurrentText(defaults.mode)
-        self._my_sig_info.setText(defaults.my_sig_info)
+        self._my_sig_info.setText(_format_field_label("MY_SIG_INFO", defaults.my_sig_info))
         self._rst_sent.setText(defaults.rst_sent)
         self._rst_rcvd.setText(defaults.rst_rcvd)
         self._rst_sent_default = defaults.rst_sent
         self._rst_rcvd_default = defaults.rst_rcvd
         self._freq.setText(defaults.freq)
-        self._operator.setText(defaults.operator)
-        self._my_rig.setText(defaults.my_rig)
+        self._operator.setText(_format_field_label("OPERATOR", defaults.operator))
+        self._my_rig.setText(_format_field_label("MY_RIG", defaults.my_rig))
         self._tx_pwr.setText(defaults.tx_pwr)
         self._call.setFocus()
 
@@ -157,27 +158,27 @@ class QsoEntryFormWidget(QWidget):
             self._on_submit_clicked()
 
     def _on_submit_clicked(self) -> None:
-        qso_date_value = self._qso_date.date()
+        assert self._entry_defaults is not None
         time_on_value = self._time_on.time()
         request = SubmitQsoRequest(
             call=self._call.text(),
-            qso_date=date(qso_date_value.year(), qso_date_value.month(), qso_date_value.day()),
+            qso_date=self._entry_defaults.qso_date,
             time_on=time(time_on_value.hour(), time_on_value.minute(), time_on_value.second()),
             mode=self._mode.currentText(),
-            my_sig_info=self._my_sig_info.text(),
+            my_sig_info=self._entry_defaults.my_sig_info,
             rst_sent=self._rst_sent.text(),
             rst_rcvd=self._rst_rcvd.text(),
             freq=self._freq.text(),
-            operator=self._operator.text(),
-            my_rig=self._my_rig.text(),
+            operator=self._entry_defaults.operator,
+            my_rig=self._entry_defaults.my_rig,
             tx_pwr=self._tx_pwr.text(),
         )
         self.submitted.emit(request)
 
 
-def _to_qdate(value: date) -> QDate:
-    return QDate(value.year, value.month, value.day)
-
-
 def _to_qtime(value: time) -> QTime:
     return QTime(value.hour, value.minute, value.second)
+
+
+def _format_field_label(name: str, value: str) -> str:
+    return f"{name}: <b>{html.escape(value)}</b>"
