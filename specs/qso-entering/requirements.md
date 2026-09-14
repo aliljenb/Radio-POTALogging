@@ -27,6 +27,19 @@ read-only fields, and small cross-reference edits follow in Story 1
 criteria are now inapplicable there). Ready for a `/spec-design
 qso-entering` follow-up pass._
 
+_Story 12 approved 2026-09-14: the 4 read-only column-3 fields (MY_SIG_INFO,
+QSO_DATE, OPERATOR, MY_RIG) stop being disabled/grayed-out input widgets
+and instead display as a single combined text label per field, formatted
+"FIELD_NAME: value" (e.g. "MY_SIG_INFO: SE-0072", "QSO_DATE: 2026-09-07",
+"OPERATOR: SM6Y", "MY_RIG: Elecraft KX2"). Ready for a `/spec-design
+qso-entering` follow-up pass._
+
+_Story 12 approved again 2026-09-14: within each of the 4 combined text
+labels (MY_SIG_INFO, QSO_DATE, OPERATOR, MY_RIG), the value portion (the
+text after "FIELD_NAME: ") is now shown in bold font weight; the field-name
+portion (e.g. "MY_SIG_INFO: ") stays in normal weight. Ready for a
+`/spec-design qso-entering` follow-up pass._
+
 ## Introduction
 
 After a portable "Parks On The Air" (POTA) activation, an operator needs to
@@ -65,8 +78,9 @@ between entries, and triggering that ADIF export on demand.
       for every QSO, whether or not MY_SIG is shown as an editable field.
 - [ ] THE SYSTEM SHALL allow every pre-filled field to be edited by the
       operator before submission, EXCEPT MY_SIG_INFO, QSO_DATE, OPERATOR,
-      and MY_RIG, which the entry form shows read-only (Story 12) and which
-      can only be changed by starting a new session (Story 3, Story 6).
+      and MY_RIG, which the entry form shows as static text labels (Story
+      12) and which can only be changed by starting a new session (Story
+      3, Story 6).
 - [ ] IF the operator changes the value of a pre-filled, editable field
       before submitting, THEN THE SYSTEM SHALL treat the edited value (not
       the original constant) as the value to carry forward per Story 2 —
@@ -229,9 +243,9 @@ between entries, and triggering that ADIF export on demand.
       case/layout state (e.g. Caps Lock off, a non-US layout) — the same
       behavior as CALL (Story 5).
 - [ ] THE SYSTEM SHALL NOT apply live-typing uppercase handling to
-      MY_SIG_INFO on the main QSO entry form, since Story 12 makes that
-      field read-only there; the uppercase value set via the session-setup
-      dialog is simply displayed as-is.
+      MY_SIG_INFO on the main QSO entry form, since Story 12 shows that
+      field as a static text label there; the uppercase value set via the
+      session-setup dialog is simply displayed as-is within that label.
 - [ ] THE SYSTEM SHALL leave non-letter characters in MY_SIG_INFO (digits,
       "-", etc.) unchanged.
 - [ ] WHEN a QSO is submitted, THE SYSTEM SHALL store MY_SIG_INFO with any
@@ -253,9 +267,9 @@ between entries, and triggering that ADIF export on demand.
 **Acceptance criteria:**
 
 - [ ] THE SYSTEM SHALL NOT apply live-typing uppercase handling to
-      OPERATOR on the main QSO entry form, since Story 12 makes that field
-      read-only there; the uppercase value set via the session-setup
-      dialog is simply displayed as-is.
+      OPERATOR on the main QSO entry form, since Story 12 shows that field
+      as a static text label there; the uppercase value set via the
+      session-setup dialog is simply displayed as-is within that label.
 - [ ] WHEN the operator types into the session-setup dialog's "Operator"
       field (Story 6), THE SYSTEM SHALL display any letters as uppercase
       in the same way.
@@ -338,14 +352,15 @@ between entries, and triggering that ADIF export on demand.
       additional trigger for the same submit action the button already
       performs.
 
-### Story 12: Entry fields follow a fixed display and Tab order, with four fields shown read-only
+### Story 12: Entry fields follow a fixed display and Tab order, with four fields shown as static text labels
 
 > As an **operator**, I want **the entry form's fields laid out and
 > Tab-ordered to match how I naturally fill them in from a paper log, with
-> the fields that don't change QSO-to-QSO shown but locked**, so that **I
-> can move through the form quickly without hunting for the next field or
-> reaching for the mouse, and can't accidentally overtype a value that's
-> meant to stay the same for the whole session**.
+> the fields that don't change QSO-to-QSO shown as plain text rather than
+> editable-looking fields**, so that **I can move through the form quickly
+> without hunting for the next field or reaching for the mouse, and can't
+> mistake a value that's meant to stay the same for the whole session for
+> something I can edit**.
 
 **Acceptance criteria:**
 
@@ -354,34 +369,41 @@ between entries, and triggering that ADIF export on demand.
 
   | Column 1 | Column 2 | Column 3 |
   |----------|----------|----------|
-  | CALL | FREQ | MY_SIG_INFO (read-only) |
-  | RST_RCVD | MODE | QSO_DATE (read-only) |
-  | RST_SENT | TX_PWR | OPERATOR (read-only) |
-  | TIME_ON | | MY_RIG (read-only) |
+  | CALL | FREQ | MY_SIG_INFO (text label) |
+  | RST_RCVD | MODE | QSO_DATE (text label) |
+  | RST_SENT | TX_PWR | OPERATOR (text label) |
+  | TIME_ON | | MY_RIG (text label) |
 
-- [ ] THE SYSTEM SHALL render MY_SIG_INFO, QSO_DATE, OPERATOR, and MY_RIG
-      as read-only on the entry form: THE SYSTEM SHALL continue to display
-      each field's current value (from the first-entry defaults of Story 1
-      or carried forward per Story 2), but SHALL NOT accept typed or
-      otherwise operator-initiated edits to these four fields on the entry
-      form.
-- [ ] THE SYSTEM SHALL render MY_SIG_INFO, QSO_DATE, OPERATOR, and MY_RIG
-      with a disabled/grayed-out appearance (the platform's standard
-      disabled-widget style), visually distinguishing them from the 7
-      still-editable fields (CALL, RST_RCVD, RST_SENT, TIME_ON, FREQ,
-      MODE, TX_PWR).
-- [ ] THE SYSTEM SHALL continue to update QSO_DATE automatically when the
-      midnight-rollover rule (Story 2) applies, even though QSO_DATE is
-      read-only — "read-only" means the operator cannot type into the
-      field, not that the system stops maintaining its value.
+- [ ] THE SYSTEM SHALL render each of MY_SIG_INFO, QSO_DATE, OPERATOR, and
+      MY_RIG as a single static text label (not an input field of any
+      kind, editable or disabled), formatted as the field's name, a colon,
+      a space, and its current value — for example "MY_SIG_INFO: SE-0072",
+      "QSO_DATE: 2026-09-07", "OPERATOR: SM6Y", "MY_RIG: Elecraft KX2".
+- [ ] THE SYSTEM SHALL display the value portion of each of these four
+      labels (the text after the field name, colon, and space — e.g.
+      "SE-0072" within "MY_SIG_INFO: SE-0072") in bold font weight, while
+      the field-name-and-colon portion (e.g. "MY_SIG_INFO: ") stays in
+      normal font weight, within the same single label.
+- [ ] THE SYSTEM SHALL continue to reflect each field's current value in
+      its label (from the first-entry defaults of Story 1 or carried
+      forward per Story 2), and SHALL NOT accept typed or otherwise
+      operator-initiated edits to these four fields on the entry form —
+      a text label offers no input mechanism for the operator to use.
+- [ ] THE SYSTEM SHALL continue to update the QSO_DATE label's value
+      automatically when the midnight-rollover rule (Story 2) applies,
+      even though QSO_DATE is shown as a text label — displaying a value
+      as a label means the operator cannot type into it, not that the
+      system stops maintaining its value.
 - [ ] THE SYSTEM SHALL set the keyboard Tab order to visit only the 7
       still-editable fields, column-major — top-to-bottom through column
-      1, then column 2 — skipping the 4 read-only fields entirely: CALL,
+      1, then column 2 — since MY_SIG_INFO, QSO_DATE, OPERATOR, and MY_RIG
+      are plain text labels with no input mechanism to receive focus: CALL,
       RST_RCVD, RST_SENT, TIME_ON, FREQ, MODE, TX_PWR.
 - [ ] THE SYSTEM SHALL NOT otherwise change any field's behavior (default
       value, carry-forward, uppercase normalization, validation) for any
       of the 11 fields — this story only changes where fields appear, which
-      4 are read-only, and how Tab moves between the remaining 7.
+      4 are shown as text labels instead of input fields, and how Tab
+      moves between the remaining 7.
 - [ ] THE SYSTEM SHALL NOT change how MY_SIG_INFO, QSO_DATE, OPERATOR, or
       MY_RIG are set in the first place — they still come from the
       session-setup dialog (Story 6) for the first entry and are still
@@ -527,11 +549,21 @@ between entries, and triggering that ADIF export on demand.
   TX_PWR from what is stored per QSO or from the generated ADIF file —
   Story 16 only hides them from the table display.
 - Editing MY_SIG_INFO, QSO_DATE, OPERATOR, or MY_RIG directly on the entry
-  form — Story 12 makes these 4 fields read-only there; they are only set
-  via the session-setup dialog (Story 6) at the start of a session, or (for
-  QSO_DATE only) advanced automatically on midnight rollover (Story 2).
-- Tabbing keyboard focus onto a read-only field (MY_SIG_INFO, QSO_DATE,
-  OPERATOR, MY_RIG) — Story 12's Tab order skips all 4 entirely.
+  form — Story 12 shows these 4 fields as static text labels there, with
+  no input mechanism; they are only set via the session-setup dialog
+  (Story 6) at the start of a session, or (for QSO_DATE only) advanced
+  automatically on midnight rollover (Story 2).
+- Tabbing keyboard focus onto MY_SIG_INFO, QSO_DATE, OPERATOR, or MY_RIG —
+  Story 12 renders these as plain text labels, which have no input
+  mechanism to receive focus in the first place.
+- Any disabled/grayed-out input-widget styling for MY_SIG_INFO, QSO_DATE,
+  OPERATOR, or MY_RIG — Story 12 (as of 2026-09-14) shows these 4 fields
+  as combined "FIELD_NAME: value" text labels instead, not styled input
+  widgets of any kind.
+- Bolding the field-name portion of MY_SIG_INFO/QSO_DATE/OPERATOR/MY_RIG's
+  labels (e.g. the "MY_SIG_INFO: " part), or applying bold styling to any
+  other field on the entry form — Story 12's bold-value change (2026-09-14)
+  applies only to the value portion of these 4 specific labels.
 
 ## Open questions
 
@@ -592,6 +624,35 @@ between entries, and triggering that ADIF export on demand.
       now-dead live-uppercase-on-entry-form-typing wiring for MY_SIG_INFO
       (Story 7) and OPERATOR (Story 8) that this update makes unreachable.
       Then `/spec-tasks qso-entering` before `/implement-task` can add it.
+- [ ] Story 12 (updated 2026-09-14 to replace the 4 read-only column-3
+      fields' disabled input widgets with a single combined `QLabel` per
+      field, formatted "FIELD_NAME: value") needs a follow-up pass through
+      `/spec-design qso-entering` to decide: whether `QsoEntryFormWidget`
+      keeps `self._my_sig_info`/`self._qso_date`/`self._operator`/
+      `self._my_rig` as the same field names now pointing at `QLabel`
+      instances (dropping their `QFormLayout.addRow(label, widget)` row
+      label, since the label text itself now carries the field name), or
+      introduces new dedicated attributes; how each label's text is
+      refreshed when its value changes (QSO_DATE's midnight rollover,
+      Story 2, and the initial `apply_defaults()` call for both the first
+      entry and every carried-forward entry) without a `setText()`-only
+      widget API to rely on for the date/value formatting; and whether
+      these 4 widgets are removed from `self._fields`/the
+      `installEventFilter` Enter-to-submit chain (Story 11) and the
+      `setTabOrder(...)` chain (Story 12) now that they were already
+      excluded from Tab order and have no `KeyPress` handling to matter
+      for. Then `/spec-tasks qso-entering` before `/implement-task` can
+      add it.
+- [ ] Story 12 (updated again 2026-09-14 to bold just the value portion of
+      each of the 4 text labels' "FIELD_NAME: value" text) needs a
+      follow-up pass through `/spec-design qso-entering` to decide the Qt
+      mechanism: a plain `QLabel.setText(...)` call can't apply bold to
+      only part of its text, so this needs either rich-text/HTML content
+      (`QLabel.setTextFormat(Qt.TextFormat.RichText)` with a `<b>...</b>`
+      span around the value, keeping the field-name-and-colon prefix
+      outside the tag) or two separate widgets per row (a normal-weight
+      name label plus a bold-weight value label). Then `/spec-tasks
+      qso-entering` before `/implement-task` can add it.
 
 Resolved from earlier drafting, still valid:
 

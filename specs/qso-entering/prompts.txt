@@ -102,3 +102,13 @@ Fields with a * in front of them shall be read-only fields.
   | RST_SENT | TX_PWR      | * OPERATOR    |
   | TIME_ON  |             | * MY_RIG      |
 ------------------------------
+## Change to Story 12
+In the main dialog the following fields shall be shown as text labels instead of fields (with the information from the initial modal dialog), like the following:
+MY_SIG_INFO: SE-0072
+QSO_DATE: 2026-09-07
+OPERATOR: SM6Y
+MY_RIG: Elecraft KX2
+------------------------------
+## Change to Story 12
+The values of MY_SIG_INFO, QSO_DATE, OPERATOR and MY_RIG shall be displayed with bold font (just the values, not the label itself).
+------------------------------

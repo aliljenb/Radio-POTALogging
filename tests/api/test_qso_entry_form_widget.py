@@ -39,9 +39,9 @@ def test_apply_defaults_prefills_fields_and_focuses_call(qtbot: QtBot) -> None:
 
     assert widget._call.text() == ""
     assert widget._mode.currentText() == "CW"
-    assert widget._my_sig_info.text() == "K-1234"
+    assert widget._my_sig_info.text() == "MY_SIG_INFO: <b>K-1234</b>"
     assert widget._freq.text() == "14.062"
-    assert widget._operator.text() == "SM6Y"
+    assert widget._operator.text() == "OPERATOR: <b>SM6Y</b>"
     assert widget._call.hasFocus()
 
 
@@ -175,7 +175,6 @@ def test_fields_are_displayed_in_the_fixed_column_order(qtbot: QtBot) -> None:
 
     assert _row_labels(widget._column_1, 4) == ["CALL", "RST_RCVD", "RST_SENT", "TIME_ON"]
     assert _row_labels(widget._column_2, 3) == ["FREQ", "MODE", "TX_PWR"]
-    assert _row_labels(widget._column_3, 4) == ["MY_SIG_INFO", "QSO_DATE", "OPERATOR", "MY_RIG"]
 
 
 def test_tab_order_follows_the_fixed_field_order(qtbot: QtBot) -> None:
@@ -205,34 +204,66 @@ def test_tab_order_follows_the_fixed_field_order(qtbot: QtBot) -> None:
     assert visited == expected[1:]
 
 
-def test_read_only_fields_are_disabled_and_others_stay_enabled(qtbot: QtBot) -> None:
+def test_apply_defaults_formats_text_label_fields(qtbot: QtBot) -> None:
     widget = QsoEntryFormWidget()
     qtbot.addWidget(widget)
 
-    assert not widget._my_sig_info.isEnabled()
-    assert not widget._qso_date.isEnabled()
-    assert not widget._operator.isEnabled()
-    assert not widget._my_rig.isEnabled()
-    for field in widget._fields:
-        assert field.isEnabled()
-
-
-def test_apply_defaults_still_prefills_disabled_fields(qtbot: QtBot) -> None:
-    widget = QsoEntryFormWidget()
-    qtbot.addWidget(widget)
-
-    widget.apply_defaults(_defaults())
-
-    assert widget._my_sig_info.text() == "K-1234"
-    qso_date_value = widget._qso_date.date()
-    assert date(qso_date_value.year(), qso_date_value.month(), qso_date_value.day()) == date(
-        2026, 8, 30
+    widget.apply_defaults(
+        EntryDefaultsDto(
+            operator="SM6Y",
+            mode="CW",
+            my_sig_info="SE-0072",
+            rst_sent="599",
+            rst_rcvd="599",
+            freq="14.062",
+            my_rig="Elecraft KX2",
+            tx_pwr="5",
+            qso_date=date(2026, 9, 7),
+            time_on=time(9, 0),
+        )
     )
-    assert widget._operator.text() == "SM6Y"
-    assert widget._my_rig.text() == "Elecraft KX2"
+
+    assert widget._my_sig_info.text() == "MY_SIG_INFO: <b>SE-0072</b>"
+    assert widget._qso_date.text() == "QSO_DATE: <b>2026-09-07</b>"
+    assert widget._operator.text() == "OPERATOR: <b>SM6Y</b>"
+    assert widget._my_rig.text() == "MY_RIG: <b>Elecraft KX2</b>"
 
 
-def test_submit_includes_values_from_disabled_fields(qtbot: QtBot) -> None:
+def test_text_label_fields_are_forced_into_rich_text_mode(qtbot: QtBot) -> None:
+    widget = QsoEntryFormWidget()
+    qtbot.addWidget(widget)
+
+    assert widget._my_sig_info.textFormat() == Qt.TextFormat.RichText
+    assert widget._qso_date.textFormat() == Qt.TextFormat.RichText
+    assert widget._operator.textFormat() == Qt.TextFormat.RichText
+    assert widget._my_rig.textFormat() == Qt.TextFormat.RichText
+
+
+def test_apply_defaults_escapes_html_special_characters_in_text_label_fields(
+    qtbot: QtBot,
+) -> None:
+    widget = QsoEntryFormWidget()
+    qtbot.addWidget(widget)
+
+    widget.apply_defaults(
+        EntryDefaultsDto(
+            operator="SM6Y",
+            mode="CW",
+            my_sig_info="K-1234 & Co",
+            rst_sent="599",
+            rst_rcvd="599",
+            freq="14.062",
+            my_rig="Elecraft KX2",
+            tx_pwr="5",
+            qso_date=date(2026, 8, 30),
+            time_on=time(9, 0),
+        )
+    )
+
+    assert widget._my_sig_info.text() == "MY_SIG_INFO: <b>K-1234 &amp; Co</b>"
+
+
+def test_submit_includes_values_from_the_text_label_fields(qtbot: QtBot) -> None:
     widget = QsoEntryFormWidget()
     qtbot.addWidget(widget)
     widget.apply_defaults(_defaults())
@@ -244,6 +275,7 @@ def test_submit_includes_values_from_disabled_fields(qtbot: QtBot) -> None:
 
     request: SubmitQsoRequest = blocker.args[0]
     assert request.my_sig_info == "K-1234"
+    assert request.qso_date == date(2026, 8, 30)
     assert request.operator == "SM6Y"
     assert request.my_rig == "Elecraft KX2"
 

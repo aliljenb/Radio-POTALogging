@@ -72,7 +72,7 @@ def test_main_window_renders_the_given_session_start_result(qtbot: QtBot) -> Non
     qtbot.addWidget(window)
 
     assert window.qso_list.rowCount() == 1
-    assert window.form._my_sig_info.text() == "K-1234"
+    assert window.form._my_sig_info.text() == "MY_SIG_INFO: <b>K-1234</b>"
 
 
 def test_main_window_renders_an_empty_qso_list_for_a_brand_new_session(qtbot: QtBot) -> None:

@@ -41,6 +41,30 @@ field under test in `test_enter_in_a_non_call_field_submits_when_call_is_non_emp
 from MY_RIG to TX_PWR, since MY_RIG can no longer receive keyboard focus —
 mechanical fallout of the read-only change, not a design deviation._
 
+_The Story 12 text-label-fields tasks below (the same four column-3 fields
+stop being disabled `QLineEdit`/`QDateEdit` widgets and become a single
+`QLabel` each, reading "FIELD_NAME: value") are derived from
+`specs/qso-entering/design.md`'s Story 12 text-label-fields amendment
+(approved 2026-09-14) — approved and implemented 2026-09-14. Implementing
+this also required fixing one stale assertion in
+`tests/api/test_main_window.py`
+(`test_main_window_renders_the_given_session_start_result`'s
+`window.form._my_sig_info.text() == "K-1234"` became `== "MY_SIG_INFO:
+K-1234"`) — mechanical fallout of the label-formatting change, not a
+design deviation._
+
+_The Story 12 bold-value-labels tasks below (within each of the same four
+labels, only the value portion renders bold, via a rich-text `QLabel` and
+a new `_format_field_label()` helper that HTML-escapes the value) are
+derived from `specs/qso-entering/design.md`'s Story 12 bold-value-labels
+amendment (approved 2026-09-14) — approved and implemented 2026-09-14.
+Implementing this also required fixing one stale assertion in
+`tests/api/test_main_window.py`
+(`test_main_window_renders_the_given_session_start_result`'s
+`window.form._my_sig_info.text() == "MY_SIG_INFO: K-1234"` became `==
+"MY_SIG_INFO: <b>K-1234</b>"`) — mechanical fallout of the bold-markup
+change, not a design deviation._
+
 ## How to use this file
 
 Each task must name the exact file(s) and function/class/method it creates
@@ -558,6 +582,99 @@ Frontend Design section; this project has no `frontend/src`)
       input on this form); leave `uppercase_as_typed(self._call)`
       unchanged per design.md § Overview (Story 12 read-only fields
       amendment), point 4, and § Components.
+- [x] `qso_entry_form_widget.py` — **modify** `QsoEntryFormWidget.__init__`:
+      change `self._my_sig_info = QLineEdit()` to `self._my_sig_info =
+      QLabel()`; change `self._qso_date = QDateEdit()` (removing its
+      `self._qso_date.setCalendarPopup(True)` line, now meaningless on a
+      label) to `self._qso_date = QLabel()`; change `self._operator =
+      QLineEdit()` to `self._operator = QLabel()`; change `self._my_rig =
+      QLineEdit()` to `self._my_rig = QLabel()` per design.md § Overview
+      (Story 12 text-label fields amendment), point 1.
+- [x] `qso_entry_form_widget.py` — **modify** `QsoEntryFormWidget.__init__`:
+      change the four two-argument `self._column_3.addRow("MY_SIG_INFO",
+      self._my_sig_info)`, `self._column_3.addRow("QSO_DATE",
+      self._qso_date)`, `self._column_3.addRow("OPERATOR",
+      self._operator)`, `self._column_3.addRow("MY_RIG", self._my_rig)`
+      calls to the single-argument form:
+      `self._column_3.addRow(self._my_sig_info)`,
+      `self._column_3.addRow(self._qso_date)`,
+      `self._column_3.addRow(self._operator)`,
+      `self._column_3.addRow(self._my_rig)` per design.md § Overview
+      (Story 12 text-label fields amendment), point 2.
+- [x] `qso_entry_form_widget.py` — **modify** `QsoEntryFormWidget.__init__`:
+      remove the four `self._my_sig_info.setEnabled(False)`,
+      `self._qso_date.setEnabled(False)`, `self._operator.setEnabled(False)`,
+      `self._my_rig.setEnabled(False)` calls — a `QLabel` is not an input
+      widget and has nothing to disable — per design.md § Overview (Story
+      12 text-label fields amendment), point 3. No change to
+      `self._fields`, the `installEventFilter` loop, or the
+      `setTabOrder(...)` chain — those already exclude these four widgets
+      from the Story 12 read-only-fields amendment.
+- [x] `qso_entry_form_widget.py` — **modify** `QsoEntryFormWidget.__init__`:
+      add `self._entry_defaults: EntryDefaultsDto | None = None` per
+      design.md § Overview (Story 12 text-label fields amendment), point 5.
+- [x] `qso_entry_form_widget.py` — **modify** `apply_defaults(self, defaults:
+      EntryDefaultsDto)`: replace
+      `self._my_sig_info.setText(defaults.my_sig_info)`,
+      `self._qso_date.setDate(_to_qdate(defaults.qso_date))`,
+      `self._operator.setText(defaults.operator)`, and
+      `self._my_rig.setText(defaults.my_rig)` with `self._entry_defaults =
+      defaults` followed by
+      `self._my_sig_info.setText(f"MY_SIG_INFO: {defaults.my_sig_info}")`,
+      `self._qso_date.setText(f"QSO_DATE: {defaults.qso_date.isoformat()}")`,
+      `self._operator.setText(f"OPERATOR: {defaults.operator}")`, and
+      `self._my_rig.setText(f"MY_RIG: {defaults.my_rig}")` per design.md §
+      Overview (Story 12 text-label fields amendment), point 4.
+- [x] `qso_entry_form_widget.py` — **modify** `_on_submit_clicked`: add
+      `assert self._entry_defaults is not None` at the top; remove the
+      `qso_date_value = self._qso_date.date()` line; in the
+      `SubmitQsoRequest(...)` construction, replace
+      `qso_date=date(qso_date_value.year(), qso_date_value.month(),
+      qso_date_value.day())` with `qso_date=self._entry_defaults.qso_date`;
+      replace `my_sig_info=self._my_sig_info.text()` with
+      `my_sig_info=self._entry_defaults.my_sig_info`; replace
+      `operator=self._operator.text()` with
+      `operator=self._entry_defaults.operator`; replace
+      `my_rig=self._my_rig.text()` with
+      `my_rig=self._entry_defaults.my_rig` per design.md § Overview (Story
+      12 text-label fields amendment), point 5.
+- [x] `qso_entry_form_widget.py` — delete the module-level `_to_qdate(value:
+      date) -> QDate` function; remove the now-unused `QDateEdit` import
+      (`PyQt6.QtWidgets`) and `QDate` import (`PyQt6.QtCore`); change `from
+      datetime import date, time` to `from datetime import time` (`date` is
+      no longer referenced in this module) per design.md § Overview (Story
+      12 text-label fields amendment), point 6.
+- [x] `qso_entry_form_widget.py` — **modify** `QsoEntryFormWidget.__init__`:
+      right after `self._my_sig_info = QLabel()`, `self._qso_date =
+      QLabel()`, `self._operator = QLabel()`, and `self._my_rig = QLabel()`,
+      add a matching `self._my_sig_info.setTextFormat(Qt.TextFormat.RichText)`,
+      `self._qso_date.setTextFormat(Qt.TextFormat.RichText)`,
+      `self._operator.setTextFormat(Qt.TextFormat.RichText)`, and
+      `self._my_rig.setTextFormat(Qt.TextFormat.RichText)` call per
+      design.md § Overview (Story 12 bold-value labels amendment), point 1.
+- [x] `qso_entry_form_widget.py` — add `import html` to the module's
+      imports, and **new function** `_format_field_label(name: str, value:
+      str) -> str`, defined at module level (alongside `_to_qtime`):
+      returns `f"{name}: <b>{html.escape(value)}</b>"` per design.md §
+      Overview (Story 12 bold-value labels amendment), point 2.
+- [x] `qso_entry_form_widget.py` — **modify** `apply_defaults(self, defaults:
+      EntryDefaultsDto)`: replace
+      `self._my_sig_info.setText(f"MY_SIG_INFO: {defaults.my_sig_info}")`
+      with `self._my_sig_info.setText(_format_field_label("MY_SIG_INFO",
+      defaults.my_sig_info))`; replace `self._qso_date.setText(f"QSO_DATE:
+      {defaults.qso_date.isoformat()}")` with
+      `self._qso_date.setText(_format_field_label("QSO_DATE",
+      defaults.qso_date.isoformat()))`; replace
+      `self._operator.setText(f"OPERATOR: {defaults.operator}")` with
+      `self._operator.setText(_format_field_label("OPERATOR",
+      defaults.operator))`; replace `self._my_rig.setText(f"MY_RIG:
+      {defaults.my_rig}")` with
+      `self._my_rig.setText(_format_field_label("MY_RIG",
+      defaults.my_rig))` per design.md § Overview (Story 12 bold-value
+      labels amendment), point 3. No change to `_on_submit_clicked()` —
+      it already reads these four values from `self._entry_defaults`, not
+      from the widgets' displayed text, per design.md § Overview (Story 12
+      bold-value labels amendment), point 4.
 
 ## Frontend
 
@@ -989,6 +1106,78 @@ N/A — this project has no `frontend/src`; see design.md § API Layer.
       longer be the field under test; the assertion itself (`submitted` is
       emitted with the expected `SubmitQsoRequest`) is unchanged per
       design.md § Testing Strategy (Story 12 read-only fields).
+- [x] `tests/api/test_qso_entry_form_widget.py` — **remove** the Story 12
+      column-layout row-label-text assertion for `widget._column_3` (there
+      is no longer a `QFormLayout.ItemRole.LabelRole` widget for any of its
+      4 rows, since they're now added via the single-argument
+      `addRow(widget)` overload); the `widget._column_1`/`widget._column_2`
+      row-label-text assertions are unaffected per design.md § Testing
+      Strategy (Story 12 text-label fields, authoritative).
+- [x] `tests/api/test_qso_entry_form_widget.py` — **modify** the "calling
+      `apply_defaults(a_entry_defaults_dto)` sets `widget._my_sig_info.text()`,
+      `widget._qso_date.date()` ... despite all four widgets being
+      disabled" test: rewrite to assert
+      `widget._my_sig_info.text() == "MY_SIG_INFO: SE-0072"`,
+      `widget._qso_date.text() == "QSO_DATE: 2026-09-07"`,
+      `widget._operator.text() == "OPERATOR: SM6Y"`, and
+      `widget._my_rig.text() == "MY_RIG: Elecraft KX2"` (using the same
+      representative values as requirements.md's Story 12 examples), and
+      drop the "despite being disabled" framing — no widget here is
+      disabled anymore per design.md § Testing Strategy (Story 12
+      text-label fields).
+- [x] `tests/api/test_qso_entry_form_widget.py` — **remove** the pytest-qt
+      test asserting `widget._my_sig_info.isEnabled()`,
+      `widget._qso_date.isEnabled()`, `widget._operator.isEnabled()`, and
+      `widget._my_rig.isEnabled()` are all `False` (added by the Story 12
+      read-only-fields amendment) — a `QLabel` has no enabled/disabled
+      styling relevant to this story per design.md § Testing Strategy
+      (Story 12 text-label fields).
+- [x] `tests/api/test_qso_entry_form_widget.py` — **modify** the "submitting
+      the form ... assert the emitted `SubmitQsoRequest`'s `my_sig_info`,
+      `operator`, and `my_rig` fields match what `apply_defaults()` set,
+      proving `.text()`/`.date()` reads on a disabled widget still return
+      its current value" test: rewrite to also assert `qso_date` matches,
+      and update the rationale in the test's assertions/docstring to prove
+      `_on_submit_clicked()` sources all four values from
+      `self._entry_defaults` (the stored `EntryDefaultsDto`), not from
+      reading the now-display-only `QLabel` text back apart, per design.md
+      § Testing Strategy (Story 12 text-label fields). The Tab-chain
+      `.nextInFocusChain()` test is left unmodified — design.md states its
+      expected sequence is unaffected, only its rationale changes (a
+      `QLabel` was never part of Qt's focus chain to begin with).
+- [x] `tests/api/test_qso_entry_form_widget.py` — **modify** the "calling
+      `apply_defaults(...)` formats the four text-label fields" test
+      (formerly asserting `widget._my_sig_info.text() == "MY_SIG_INFO:
+      SE-0072"`, etc.): rewrite the expected text to
+      `widget._my_sig_info.text() == "MY_SIG_INFO: <b>SE-0072</b>"`,
+      `widget._qso_date.text() == "QSO_DATE: <b>2026-09-07</b>"`,
+      `widget._operator.text() == "OPERATOR: <b>SM6Y</b>"`, and
+      `widget._my_rig.text() == "MY_RIG: <b>Elecraft KX2</b>"`, proving
+      only the value is wrapped in `<b>...</b>` per design.md § Testing
+      Strategy (Story 12 bold-value labels, authoritative).
+- [x] `tests/api/test_qso_entry_form_widget.py` — **add** a pytest-qt test:
+      after constructing `QsoEntryFormWidget`, each of
+      `widget._my_sig_info.textFormat()`, `widget._qso_date.textFormat()`,
+      `widget._operator.textFormat()`, and `widget._my_rig.textFormat()`
+      equals `Qt.TextFormat.RichText` — proving the format is forced
+      rather than left to `QLabel`'s default auto-detection per design.md
+      § Testing Strategy (Story 12 bold-value labels).
+- [x] `tests/api/test_qso_entry_form_widget.py` — **add** a pytest-qt test:
+      calling `apply_defaults(...)` with `my_sig_info="K-1234 & Co"` (an
+      `EntryDefaultsDto` otherwise built the same as `_defaults()`) results
+      in `widget._my_sig_info.text() == "MY_SIG_INFO: <b>K-1234 &amp;
+      Co</b>"` — proving a value containing an HTML-special character is
+      escaped via `html.escape()`, not rendered as markup or dropped per
+      design.md § Testing Strategy (Story 12 bold-value labels).
+- [x] `tests/api/test_qso_entry_form_widget.py` — **modify** the "submitting
+      the form ... assert the emitted `SubmitQsoRequest`'s `my_sig_info`,
+      `qso_date`, `operator`, and `my_rig` fields match what
+      `apply_defaults()` set" test: confirm (no assertion change expected,
+      but re-verify after this amendment lands) the emitted values remain
+      the *unescaped, unmarked-up* values — `"K-1234"`, not
+      `"<b>K-1234</b>"` — since `_on_submit_clicked()` reads from
+      `self._entry_defaults`, never from the labels' displayed HTML text,
+      per design.md § Testing Strategy (Story 12 bold-value labels).
 
 ## Task Dependencies
 
@@ -1305,4 +1494,64 @@ N/A — this project has no `frontend/src`; see design.md § API Layer.
   it depends on none of them — purely confined to
   `qso_entry_form_widget.py` and its own test file, same as the two prior
   Story 12 amendments.
+- Independent of every other amendment in this file.
+
+### Story 12 text-label fields amendment (added after the Story 12 read-only fields amendment was implemented)
+
+- All six `qso_entry_form_widget.py` tasks in this amendment touch the same
+  file and must land in this order: (1) the widget-type swap (`QLineEdit`/
+  `QDateEdit` → `QLabel`), (2) the `addRow(...)` calls dropping their label
+  argument, (3) removing the four `setEnabled(False)` calls, (4) adding
+  `self._entry_defaults: EntryDefaultsDto | None = None`, (5)
+  `apply_defaults()`'s text-formatting rewrite (also sets
+  `self._entry_defaults`), (6) `_on_submit_clicked()`'s rewrite to read
+  from `self._entry_defaults`, and finally (7) deleting `_to_qdate()` and
+  the now-unused imports. Tasks (1)–(3) must land before (5), since
+  `apply_defaults()`'s new `.setText(f"...")` calls require the widgets to
+  already be `QLabel`s and the `addRow`/`setEnabled` shape to already be
+  settled; task (4) must land before (5) and (6), since both reference
+  `self._entry_defaults`; task (6) must land before (7), since only after
+  `_on_submit_clicked()` stops calling `self._qso_date.date()` is
+  `_to_qdate()` (and the `QDate`/`QDateEdit`/`date` imports) actually dead.
+- All six/seven implementation tasks depend on the already-implemented
+  Story 12 read-only-fields amendment (they modify the widget
+  construction, `addRow(...)` calls, and `setEnabled(False)` calls it
+  introduced).
+- Each must land before its own modified/removed
+  `test_qso_entry_form_widget.py` test task above — in particular, the
+  column-3 row-label-text removal depends on task (2); the label-text
+  content test depends on tasks (1) and (5); the `.isEnabled()` test
+  removal depends on task (3); and the submitted-values test rewrite
+  depends on tasks (4)–(6).
+- No domain/application/infrastructure task depends on this amendment, and
+  it depends on none of them — purely confined to
+  `qso_entry_form_widget.py` and its own test file, same as every prior
+  Story 12 amendment.
+- Independent of every other amendment in this file.
+
+### Story 12 bold-value labels amendment (added after the Story 12 text-label fields amendment was implemented)
+
+- The three `qso_entry_form_widget.py` tasks in this amendment must land
+  in this order: (1) the four `.setTextFormat(Qt.TextFormat.RichText)`
+  calls, (2) the new `_format_field_label()` helper (and its `import
+  html`), (3) `apply_defaults()`'s switch to calling
+  `_format_field_label(...)`. Task (3) depends on both (1) — the widgets
+  must already be forced into rich-text mode before they're given HTML
+  text, so a value containing something that looks like a tag can't be
+  misinterpreted under `AutoText` in between — and (2) — it calls the
+  helper task (2) defines. Tasks (1) and (2) have no dependency on each
+  other and may land in either order.
+- All three tasks depend on the already-implemented Story 12 text-label
+  fields amendment (they modify the `QLabel` construction and
+  `apply_defaults()`'s text-formatting lines it introduced).
+- Each must land before its own new/modified `test_qso_entry_form_widget.py`
+  test task above — in particular, the `.textFormat()` test depends on
+  task (1); the bold-markup label-text rewrite and the HTML-escaping test
+  depend on tasks (1)–(3) together; the submitted-values re-verification
+  depends on task (3) (confirming `_on_submit_clicked()`'s existing
+  `self._entry_defaults` reads are unaffected).
+- No domain/application/infrastructure task depends on this amendment, and
+  it depends on none of them — purely confined to
+  `qso_entry_form_widget.py` and its own test file, same as every prior
+  Story 12 amendment.
 - Independent of every other amendment in this file.
