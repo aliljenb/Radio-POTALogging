@@ -15,6 +15,9 @@ from radio_pota_logging.domain.logging_session.value_objects import (
 __all__ = [
     "MODE_OPTIONS",
     "AdifExportResult",
+    "DeleteQsoRequest",
+    "EditQsoRequest",
+    "EditQsoResult",
     "EntryDefaultsDto",
     "QsoDto",
     "SessionStartResult",
@@ -88,6 +91,32 @@ class SessionStartResult:
 class SubmitQsoResult:
     entry_defaults: EntryDefaultsDto
     submitted: QsoDto
+
+
+@dataclass(frozen=True)
+class EditQsoRequest:
+    """Raw field values as edited on an already-submitted QSO's table row."""
+
+    index: int
+    call: str
+    qso_date: date
+    time_on: time
+    mode: str
+    rst_sent: str
+    rst_rcvd: str
+    freq: str
+
+
+@dataclass(frozen=True)
+class EditQsoResult:
+    qso: QsoDto
+
+
+@dataclass(frozen=True)
+class DeleteQsoRequest:
+    """Which already-submitted QSO to remove."""
+
+    index: int
 
 
 @dataclass(frozen=True)

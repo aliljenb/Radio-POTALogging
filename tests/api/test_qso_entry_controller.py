@@ -2,12 +2,16 @@ from datetime import date, time
 from pathlib import Path
 
 import pytest
+from PyQt6.QtWidgets import QMessageBox
 from pytestqt.qtbot import QtBot
 from radio_pota_logging.api import qso_entry_controller as controller_module
 from radio_pota_logging.api.qso_entry_controller import QsoEntryController
 from radio_pota_logging.api.qso_entry_form_widget import QsoEntryFormWidget
 from radio_pota_logging.api.qso_list_widget import QsoListWidget
 from radio_pota_logging.application.logging_session.dto import (
+    DeleteQsoRequest,
+    EditQsoRequest,
+    EditQsoResult,
     EntryDefaultsDto,
     QsoDto,
     SubmitQsoRequest,
@@ -62,6 +66,26 @@ class FakeSubmitQsoCommand:
         return SubmitQsoResult(entry_defaults=_entry_defaults(), submitted=_qso_dto())
 
 
+class FakeEditQsoCommand:
+    def __init__(self, *, raises: Exception | None = None) -> None:
+        self._raises = raises
+        self.executed_with: object = None
+
+    def execute(self, request: object) -> EditQsoResult:
+        self.executed_with = request
+        if self._raises is not None:
+            raise self._raises
+        return EditQsoResult(qso=_qso_dto())
+
+
+class FakeDeleteQsoCommand:
+    def __init__(self) -> None:
+        self.executed_with: object = None
+
+    def execute(self, request: object) -> None:
+        self.executed_with = request
+
+
 class FakeGenerateAdifCommand:
     def __init__(self) -> None:
         self.executed_with: Path | None = None
@@ -83,6 +107,8 @@ def _make_controller(
     submit_command: object,
     generate_adif_command: object,
     suggest_adif_filename_command: object | None = None,
+    edit_command: object | None = None,
+    delete_command: object | None = None,
 ) -> tuple[QsoEntryController, QsoEntryFormWidget, QsoListWidget]:
     form = QsoEntryFormWidget()
     qso_list = QsoListWidget()
@@ -93,6 +119,8 @@ def _make_controller(
         form=form,
         qso_list=qso_list,
         submit_command=submit_command,  # type: ignore[arg-type]
+        edit_command=edit_command or FakeEditQsoCommand(),  # type: ignore[arg-type]
+        delete_command=delete_command or FakeDeleteQsoCommand(),  # type: ignore[arg-type]
         generate_adif_command=generate_adif_command,  # type: ignore[arg-type]
         suggest_adif_filename_command=suggest_adif_filename_command  # type: ignore[arg-type]
         or FakeSuggestAdifFilenameQuery(),
@@ -207,3 +235,86 @@ def test_generate_adif_does_nothing_when_dialog_is_cancelled(
     controller.generate_adif()
 
     assert generate_adif_command.executed_with is None
+
+
+def _edit_request(**overrides: object) -> EditQsoRequest:
+    fields: dict[str, object] = {
+        "index": 0,
+        "call": "K1ABC",
+        "qso_date": date(2026, 8, 30),
+        "time_on": time(9, 0),
+        "mode": "CW",
+        "rst_sent": "599",
+        "rst_rcvd": "599",
+        "freq": "14.062",
+    }
+    fields.update(overrides)
+    return EditQsoRequest(**fields)  # type: ignore[arg-type]
+
+
+def test_successful_edit_applies_result_to_the_list_and_clears_error(qtbot: QtBot) -> None:
+    edit_command = FakeEditQsoCommand()
+    _, form, qso_list = _make_controller(
+        qtbot, FakeSubmitQsoCommand(), FakeGenerateAdifCommand(), edit_command=edit_command
+    )
+    qso_list.append_qso(_qso_dto())
+
+    qso_list.edited.emit(0, _edit_request())
+
+    assert edit_command.executed_with is not None
+    assert qso_list.item(0, 0).text() == "W1AW"  # from FakeEditQsoCommand's fixed _qso_dto()
+    assert not form._error_label.isVisible()
+
+
+def test_failed_edit_shows_inline_error_and_reverts_the_row(qtbot: QtBot) -> None:
+    edit_command = FakeEditQsoCommand(raises=FrequencyOutOfBandError("5.000 MHz"))
+    _, form, qso_list = _make_controller(
+        qtbot, FakeSubmitQsoCommand(), FakeGenerateAdifCommand(), edit_command=edit_command
+    )
+    qso_list.append_qso(_qso_dto())
+
+    qso_list.edited.emit(0, _edit_request(freq="5.000"))
+
+    assert form._error_label.isVisible()
+    assert qso_list.item(0, 0).text() == "W1AW"
+    assert qso_list.item(0, 5).text() == "14.062"
+
+
+def test_confirmed_delete_calls_command_and_removes_the_row(
+    qtbot: QtBot, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        controller_module.QMessageBox,
+        "question",
+        classmethod(lambda *_args, **_kwargs: QMessageBox.StandardButton.Yes),
+    )
+    delete_command = FakeDeleteQsoCommand()
+    controller, _, qso_list = _make_controller(
+        qtbot, FakeSubmitQsoCommand(), FakeGenerateAdifCommand(), delete_command=delete_command
+    )
+    qso_list.append_qso(_qso_dto())
+
+    qso_list.delete_requested.emit(0)
+
+    assert controller is not None
+    assert delete_command.executed_with == DeleteQsoRequest(index=0)
+    assert qso_list.rowCount() == 0
+
+
+def test_cancelled_delete_does_nothing(qtbot: QtBot, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        controller_module.QMessageBox,
+        "question",
+        classmethod(lambda *_args, **_kwargs: QMessageBox.StandardButton.No),
+    )
+    delete_command = FakeDeleteQsoCommand()
+    controller, _, qso_list = _make_controller(
+        qtbot, FakeSubmitQsoCommand(), FakeGenerateAdifCommand(), delete_command=delete_command
+    )
+    qso_list.append_qso(_qso_dto())
+
+    qso_list.delete_requested.emit(0)
+
+    assert controller is not None
+    assert delete_command.executed_with is None
+    assert qso_list.rowCount() == 1

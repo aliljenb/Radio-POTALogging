@@ -46,6 +46,43 @@ def test_save_then_find_unfinished_round_trips(tmp_path: Path) -> None:
     assert reloaded.session_start == session.session_start
 
 
+def test_save_then_find_unfinished_round_trips_an_edited_qso(tmp_path: Path) -> None:
+    session = LoggingSession.start(QsoTimestamp(date(2026, 8, 30), time(9, 0)), **_STATION_KWARGS)
+    session.record_qso(
+        call="W1AW",
+        qso_date=date(2026, 8, 30),
+        time_on=time(9, 0),
+        mode="CW",
+        my_sig_info="K-1234",
+        rst_sent="599",
+        rst_rcvd="599",
+        freq="14.062",
+        operator="SM6Y",
+        my_rig="Elecraft KX2",
+        tx_pwr="5",
+    )
+    session.edit_qso(
+        0,
+        call="K1ABC",
+        qso_date=date(2026, 8, 30),
+        time_on=time(9, 0),
+        mode="CW",
+        rst_sent="579",
+        rst_rcvd="588",
+        freq="7.030",
+    )
+    repository = FileLoggingSessionRepository(tmp_path)
+    repository.save(session)
+
+    reloaded = repository.find_unfinished()
+
+    assert reloaded is not None
+    assert reloaded.qsos[0].call == "K1ABC"
+    assert reloaded.qsos[0].rst_sent == "579"
+    assert reloaded.qsos[0].rst_rcvd == "588"
+    assert reloaded.qsos[0].band.value == "40M"
+
+
 def test_save_then_find_unfinished_preserves_session_start(tmp_path: Path) -> None:
     session = LoggingSession.start(
         QsoTimestamp(date(2026, 8, 30), time(9, 0)), my_sig_info="k-1234", **_STATION_KWARGS

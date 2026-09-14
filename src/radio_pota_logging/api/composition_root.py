@@ -8,6 +8,8 @@ from pathlib import Path
 from PyQt6.QtWidgets import QApplication
 
 from radio_pota_logging.application.logging_session.commands import (
+    DeleteQsoCommand,
+    EditQsoCommand,
     GenerateAdifCommand,
     ResumeSessionCommand,
     StartNewSessionCommand,
@@ -43,6 +45,8 @@ def main() -> int:
     window = MainWindow(
         initial_result=initial_result,
         submit_qso=SubmitQsoCommand(repository),
+        edit_qso=EditQsoCommand(repository),
+        delete_qso=DeleteQsoCommand(repository),
         generate_adif=GenerateAdifCommand(repository, exporter),
         suggest_adif_filename=SuggestAdifFilenameQuery(repository),
     )

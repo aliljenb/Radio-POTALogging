@@ -4,17 +4,24 @@ from pathlib import Path
 
 import pytest
 from radio_pota_logging.application.logging_session.commands import (
+    DeleteQsoCommand,
+    EditQsoCommand,
     GenerateAdifCommand,
     ResumeSessionCommand,
     StartNewSessionCommand,
     SubmitQsoCommand,
 )
 from radio_pota_logging.application.logging_session.dto import (
+    DeleteQsoRequest,
+    EditQsoRequest,
     SessionStartResult,
     SubmitQsoRequest,
 )
 from radio_pota_logging.domain.logging_session.entities import LoggingSession
-from radio_pota_logging.domain.logging_session.exceptions import FrequencyOutOfBandError
+from radio_pota_logging.domain.logging_session.exceptions import (
+    FrequencyFormatError,
+    FrequencyOutOfBandError,
+)
 from radio_pota_logging.domain.logging_session.value_objects import (
     Qso,
     QsoTimestamp,
@@ -177,6 +184,133 @@ def test_submit_qso_propagates_domain_validation_errors() -> None:
     repository = FakeRepository(session)
     with pytest.raises(FrequencyOutOfBandError):
         SubmitQsoCommand(repository).execute(_submit_request(freq="5.000"))
+
+
+def _edit_request(**overrides: object) -> EditQsoRequest:
+    fields: dict[str, object] = {
+        "index": 0,
+        "call": "W1AW",
+        "qso_date": date(2026, 8, 30),
+        "time_on": time(9, 0),
+        "mode": "CW",
+        "rst_sent": "599",
+        "rst_rcvd": "599",
+        "freq": "14.062",
+    }
+    fields.update(overrides)
+    return EditQsoRequest(**fields)  # type: ignore[arg-type]
+
+
+def _session_with_one_qso() -> LoggingSession:
+    session = LoggingSession.start(
+        QsoTimestamp(date(2026, 8, 30), time(9, 0)),
+        operator="SM6Y",
+        mode="CW",
+        my_rig="Elecraft KX2",
+        tx_pwr="5",
+    )
+    session.record_qso(
+        call="W1AW",
+        qso_date=date(2026, 8, 30),
+        time_on=time(9, 0),
+        mode="CW",
+        my_sig_info="K-1234",
+        rst_sent="599",
+        rst_rcvd="599",
+        freq="14.062",
+        operator="SM6Y",
+        my_rig="Elecraft KX2",
+        tx_pwr="5",
+    )
+    return session
+
+
+def test_edit_qso_saves_and_returns_edited_qso() -> None:
+    session = _session_with_one_qso()
+    repository = FakeRepository(session)
+
+    result = EditQsoCommand(repository).execute(_edit_request(call="k1abc"))
+
+    assert result.qso.call == "K1ABC"
+    assert repository.saved[-1] is session
+
+
+def test_edit_qso_leaves_next_entry_defaults_untouched() -> None:
+    session = _session_with_one_qso()
+    original_next_entry_defaults = session.next_entry_defaults
+    repository = FakeRepository(session)
+
+    EditQsoCommand(repository).execute(_edit_request(call="K1ABC"))
+
+    assert session.next_entry_defaults is original_next_entry_defaults
+
+
+def test_edit_qso_propagates_domain_validation_errors_without_saving() -> None:
+    session = _session_with_one_qso()
+    repository = FakeRepository(session)
+
+    with pytest.raises(FrequencyFormatError):
+        EditQsoCommand(repository).execute(_edit_request(freq="not-a-number"))
+
+    assert repository.saved == []
+
+
+def _session_with_two_qsos() -> LoggingSession:
+    session = LoggingSession.start(
+        QsoTimestamp(date(2026, 8, 30), time(9, 0)),
+        operator="SM6Y",
+        mode="CW",
+        my_rig="Elecraft KX2",
+        tx_pwr="5",
+    )
+    session.record_qso(
+        call="W1AW",
+        qso_date=date(2026, 8, 30),
+        time_on=time(9, 0),
+        mode="CW",
+        my_sig_info="K-1234",
+        rst_sent="599",
+        rst_rcvd="599",
+        freq="14.062",
+        operator="SM6Y",
+        my_rig="Elecraft KX2",
+        tx_pwr="5",
+    )
+    session.record_qso(
+        call="K1ABC",
+        qso_date=date(2026, 8, 30),
+        time_on=time(9, 2),
+        mode="CW",
+        my_sig_info="K-1234",
+        rst_sent="599",
+        rst_rcvd="599",
+        freq="14.062",
+        operator="SM6Y",
+        my_rig="Elecraft KX2",
+        tx_pwr="5",
+    )
+    return session
+
+
+def test_delete_qso_removes_it_and_saves() -> None:
+    session = _session_with_two_qsos()
+    repository = FakeRepository(session)
+
+    result = DeleteQsoCommand(repository).execute(DeleteQsoRequest(index=0))
+
+    assert result is None
+    assert [qso.call for qso in session.qsos] == ["K1ABC"]
+    assert repository.saved[-1] is session
+
+
+def test_delete_qso_leaves_next_entry_defaults_untouched() -> None:
+    session = _session_with_two_qsos()
+    original_next_entry_defaults = session.next_entry_defaults
+    repository = FakeRepository(session)
+
+    DeleteQsoCommand(repository).execute(DeleteQsoRequest(index=0))
+
+    assert session.next_entry_defaults is original_next_entry_defaults
 
 
 def test_generate_adif_writes_exported_text_and_counts_qsos(tmp_path: Path) -> None:

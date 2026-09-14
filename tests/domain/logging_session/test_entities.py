@@ -259,3 +259,163 @@ def test_record_qso_rejects_out_of_band_frequency_and_leaves_state_unchanged() -
             tx_pwr="5",
         )
     assert session.qsos == ()
+
+
+def _record_two_qsos(session: LoggingSession) -> None:
+    session.record_qso(
+        call="W1AW",
+        qso_date=date(2026, 8, 30),
+        time_on=time(12, 0),
+        mode="CW",
+        my_sig_info="K-1234",
+        rst_sent="599",
+        rst_rcvd="599",
+        freq="14.062",
+        operator="SM6Y",
+        my_rig="Elecraft KX2",
+        tx_pwr="5",
+    )
+    session.record_qso(
+        call="K1ABC",
+        qso_date=date(2026, 8, 30),
+        time_on=time(12, 2),
+        mode="CW",
+        my_sig_info="K-1234",
+        rst_sent="599",
+        rst_rcvd="599",
+        freq="14.062",
+        operator="SM6Y",
+        my_rig="Elecraft KX2",
+        tx_pwr="5",
+    )
+
+
+def test_edit_qso_replaces_only_the_given_index_and_normalizes_call() -> None:
+    session = _new_session()
+    _record_two_qsos(session)
+    original_next_entry_defaults = session.next_entry_defaults
+
+    session.edit_qso(
+        0,
+        call="w1aw/p",
+        qso_date=date(2026, 8, 30),
+        time_on=time(12, 0),
+        mode="CW",
+        rst_sent="599",
+        rst_rcvd="599",
+        freq="14.062",
+    )
+
+    assert session.qsos[0].call == "W1AW/P"
+    assert session.qsos[1].call == "K1ABC"
+    assert session.next_entry_defaults is original_next_entry_defaults
+
+
+def test_edit_qso_updates_band_from_edited_frequency() -> None:
+    session = _new_session()
+    _record_two_qsos(session)
+
+    edited = session.edit_qso(
+        0,
+        call="W1AW",
+        qso_date=date(2026, 8, 30),
+        time_on=time(12, 0),
+        mode="CW",
+        rst_sent="599",
+        rst_rcvd="599",
+        freq="7.030",
+    )
+
+    assert edited.band.value == "40M"
+    assert session.qsos[0].band.value == "40M"
+
+
+def test_edit_qso_updates_time_off_from_edited_time_on() -> None:
+    session = _new_session()
+    _record_two_qsos(session)
+
+    edited = session.edit_qso(
+        0,
+        call="W1AW",
+        qso_date=date(2026, 8, 30),
+        time_on=time(13, 30),
+        mode="CW",
+        rst_sent="599",
+        rst_rcvd="599",
+        freq="14.062",
+    )
+
+    assert edited.time_off == time(13, 30)
+
+
+def test_edit_qso_rejects_unparsable_frequency_and_leaves_state_unchanged() -> None:
+    session = _new_session()
+    _record_two_qsos(session)
+    original_qso = session.qsos[0]
+
+    with pytest.raises(FrequencyFormatError):
+        session.edit_qso(
+            0,
+            call="W1AW",
+            qso_date=date(2026, 8, 30),
+            time_on=time(12, 0),
+            mode="CW",
+            rst_sent="599",
+            rst_rcvd="599",
+            freq="not-a-number",
+        )
+
+    assert session.qsos[0] == original_qso
+
+
+def test_edit_qso_rejects_out_of_band_frequency_and_leaves_state_unchanged() -> None:
+    session = _new_session()
+    _record_two_qsos(session)
+    original_qso = session.qsos[0]
+
+    with pytest.raises(FrequencyOutOfBandError):
+        session.edit_qso(
+            0,
+            call="W1AW",
+            qso_date=date(2026, 8, 30),
+            time_on=time(12, 0),
+            mode="CW",
+            rst_sent="599",
+            rst_rcvd="599",
+            freq="5.000",
+        )
+
+    assert session.qsos[0] == original_qso
+
+
+def test_delete_qso_removes_the_given_index_and_preserves_order() -> None:
+    session = _new_session()
+    _record_two_qsos(session)
+    original_next_entry_defaults = session.next_entry_defaults
+    remaining_qso = session.qsos[1]
+
+    session.delete_qso(0)
+
+    assert session.qsos == (remaining_qso,)
+    assert session.next_entry_defaults is original_next_entry_defaults
+
+
+def test_delete_qso_on_the_only_remaining_qso_leaves_an_empty_list() -> None:
+    session = _new_session()
+    _record_two_qsos(session)
+
+    session.delete_qso(0)
+    session.delete_qso(0)
+
+    assert session.qsos == ()
+
+
+def test_delete_qso_rejects_an_out_of_range_index_and_leaves_state_unchanged() -> None:
+    session = _new_session()
+    _record_two_qsos(session)
+    original_qsos = session.qsos
+
+    with pytest.raises(IndexError):
+        session.delete_qso(5)
+
+    assert session.qsos == original_qsos
