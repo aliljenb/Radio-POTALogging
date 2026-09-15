@@ -10,3 +10,4 @@ paths: []          # omit `paths` entirely to load unconditionally every session
 - tasks.md must reference specific files/functions from design.md — no vague tasks.
 - If requirements.md doesn't exist yet, spec-design and spec-tasks must refuse and
   point the user to /spec-requirements first.
+- Do not read or reference any prompt.txt files under specs/ or its subdirectories. — They are just meant as a logs, not specifications.
